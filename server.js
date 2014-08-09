@@ -56,7 +56,7 @@ try {
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {
     var message = '\nExpress server listening on port ' + app.get('port');
-    console.log(message.bold.green);
+    console.log(message.bold.blue);
   });
 }
 

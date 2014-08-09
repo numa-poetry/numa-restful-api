@@ -5,7 +5,7 @@ var RedditStrategy = require('passport-reddit').Strategy;
 var GitHubStrategy = require('passport-github').Strategy;
 var auth           = require('./auth.js');
 
-// environmental variables -----------------------------------------------------
+// authentication variables ----------------------------------------------------
 var REDDIT_CLIENT_ID     = auth.reddit.CLIENT_ID;
 var REDDIT_CLIENT_SECRET = auth.reddit.CLIENT_SECRET;
 var REDDIT_CALLBACK_URL  = auth.reddit.CALLBACK_URL;

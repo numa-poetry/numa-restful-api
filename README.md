@@ -1,15 +1,10 @@
-auth-demo
-=========
+# Warrior Poets Server
 
-Authentication demo using various strategies. Thanks to Scotch for his [Easy Node Authentication series](http://scotch.io/series/easy-node-authentication).
+Node.js server for Warrior Poets.
 
-### Backend instructions
-1. Navigate to server/
+### Instructions
+1. Clone the repo: `git clone https://github.com/trance-with-me/warrior-poets-server.git`
 2. Install packages: `npm install`
 3. Install [nodemon](http://nodemon.io/): `npm install -g nodemon`
-4. Launch server: `nodemon .\server.js`. 
-5. Visit `http://localhost:3000`
-
-### Strategies included
-* [passport-reddit](https://github.com/Slotos/passport-reddit)
-* [passport-github](https://github.com/jaredhanson/passport-github)
+4. Launch: `nodemon .\server.js`. 
+5. Visit: `http://localhost:3000`
