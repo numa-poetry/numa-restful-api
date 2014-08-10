@@ -6,6 +6,7 @@ try {
   var express         = require('express');
   var logger          = require('express-logger');
   var passport        = require('passport');
+  var mongoose        = require('mongoose');
   var bodyParser      = require('body-parser');
   var cookieParser    = require('cookie-parser');
   var session         = require('express-session');
@@ -13,6 +14,7 @@ try {
   var colors          = require('colors');
   var cors            = require('cors');
   var app             = express();
+  var db              = require('./db.js');
 
 // global config ---------------------------------------------------------------
   app.set('port', process.env.PORT || 3000);
@@ -49,6 +51,9 @@ try {
 
 // passport config -------------------------------------------------------------
   require('./passport.js')(passport);
+
+// db config -------------------------------------------------------------------
+  mongoose.connect(db.CONNECTION_URI);
 
 // routes ----------------------------------------------------------------------
   require('./routes.js')(app, passport);

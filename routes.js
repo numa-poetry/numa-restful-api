@@ -24,26 +24,21 @@ module.exports = function(app, passport) {
 
   app.get('/', function(req, res){
     console.log('\n[GET] /'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
-    res.render('index', { 
-      user: req.user 
-    });
+    console.log('Request body:'.green, req.body);
+    res.render('index');
   });
 
   app.get('/profile', ensureAuthenticated, function(req, res){
     console.log('\n[GET] /profile'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     res.render('profile', { 
-      user: req.user 
+      user: JSON.stringify(req.user , undefined, 2)
     });
   });
 
   app.get('/logout', function(req, res){
     console.log('\n[GET] /logout'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     req.logout();
     res.redirect('/');
   });
@@ -51,8 +46,7 @@ module.exports = function(app, passport) {
 // Reddit authentication -------------------------------------------------------
   app.get('/auth/reddit', function(req, res, next){
     console.log('\n[GET] /auth/reddit'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     req.session.state = crypto.randomBytes(32).toString('hex');
     passport.authenticate('reddit', {
       state    : req.session.state,
@@ -62,8 +56,7 @@ module.exports = function(app, passport) {
 
   app.get('/auth/reddit/callback', function(req, res, next){
     console.log('\n[GET] /auth/reddit/callback'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     // Check for origin via state token
     if (req.query.state == req.session.state){
       passport.authenticate('reddit', {
@@ -79,16 +72,14 @@ module.exports = function(app, passport) {
 // Github authentication -------------------------------------------------------
   app.get('/auth/github', function(req, res, next){
     console.log('\n[GET] /auth/github/'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     passport.authenticate('github', {
     })(req, res, next);
   });
 
   app.get('/auth/github/callback', function(req, res, next){
     console.log('\n[GET] /auth/github/callback'.bold.green);
-    var reqBody = 'Request body: ' + req.body;
-    console.log(reqBody.green);
+    console.log('Request body:'.green, req.body);
     passport.authenticate('github', { 
       successRedirect: '/profile',
       failureRedirect: '/'

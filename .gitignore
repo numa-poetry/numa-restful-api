@@ -1,15 +1,5 @@
 # Created by http://www.gitignore.io
 
-### Yeoman ###
-node_modules/
-bower_components/
-*.log
-.tmp
-.sass-cache
-
-build/
-dist/
-
 ### Node ###
 # Logs
 logs
@@ -44,3 +34,4 @@ node_modules
 ### Server ###
 logfile.txt
 auth.js
+db.js

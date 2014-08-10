@@ -1,9 +1,11 @@
 'use strict';
 
 // modules ---------------------------------------------------------------------
+var LocalStrategy  = require('passport-local').Strategy;
 var RedditStrategy = require('passport-reddit').Strategy;
 var GitHubStrategy = require('passport-github').Strategy;
 var auth           = require('./auth.js');
+var userModel      = require('./models/user.js');
 
 // authentication variables ----------------------------------------------------
 var REDDIT_CLIENT_ID     = auth.reddit.CLIENT_ID;
@@ -23,13 +25,25 @@ module.exports = function(passport) {
   //   the user by ID when deserializing.  However, since this example does not
   //   have a database of user records, the complete profile is
   //   serialized and deserialized.
+  // passport.serializeUser(function(user, done) {
+  //   done(null, user);
+  // });
+
+  // passport.deserializeUser(function(obj, done) {
+  //   done(null, obj);
+  // });
+
   passport.serializeUser(function(user, done) {
-    done(null, user);
+    done(null, user.id);
   });
 
-  passport.deserializeUser(function(obj, done) {
-    done(null, obj);
+  passport.deserializeUser(function(id, done) {
+    userModel.findById(id, function(err, user) {
+      done(err, user);
+    });
   });
+
+  // passport.user('')
 
   passport.use(new RedditStrategy({
       clientID     : REDDIT_CLIENT_ID,

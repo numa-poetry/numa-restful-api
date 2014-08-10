@@ -18,29 +18,13 @@
 
       <div class="row">
 
-        <!-- REDDIT INFORMATION -->
+        <!-- OAUTH INFORMATION -->
         <div class="col-sm-6">
           <div class="well">
-            <h3 class="text-info"><span class="fa fa-reddit"></span> Reddit</h3>
+            <h3 class="text-info"> Response</h3>
 
               <p>
-                <strong>id</strong>: <%= user.id %><br>
-                <strong>username</strong>: <%= user.name %><br>
-              </p>
-
-          </div>
-        </div>
-
-        <!-- GITHUB INFORMATION -->
-        <div class="col-sm-6">
-          <div class="well">
-            <h3 class="text-info"><span class="fa fa-github"></span> Github</h3>
-
-              <p>
-                <strong>id</strong>: <%= user.id %><br>
-                <strong>display name</strong>: <%= user.displayName %><br>
-                <strong>username</strong>: <%= user.username %><br>
-                <strong>email</strong>: <%= user.emails[0].value %><br>
+                <pre><%= user %></pre>
               </p>
 
           </div>
