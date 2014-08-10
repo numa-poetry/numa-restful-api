@@ -19,21 +19,6 @@ var GITHUB_CALLBACK_URL  = auth.github.CALLBACK_URL;
 
 module.exports = function(passport) {
 
-  // Passport session setup.
-  //   To support persistent login sessions, Passport needs to be able to
-  //   serialize users into and deserialize users out of the session.  Typically,
-  //   this will be as simple as storing the user ID when serializing, and finding
-  //   the user by ID when deserializing.  However, since this example does not
-  //   have a database of user records, the complete profile is
-  //   serialized and deserialized.
-  // passport.serializeUser(function(user, done) {
-  //   done(null, user);
-  // });
-
-  // passport.deserializeUser(function(obj, done) {
-  //   done(null, obj);
-  // });
-
   passport.serializeUser(function(user, done) {
     done(null, user.id);
   });
@@ -90,6 +75,9 @@ module.exports = function(passport) {
     userModel.findOne({
       'local.email' : userNameOrEmail
     }, function(err, user) {
+      if (err) {
+        return done(err);
+      }
       if (!user) {
         userModel.findOne({
           'local.userName' : userNameOrEmail
@@ -103,7 +91,7 @@ module.exports = function(passport) {
             return done(null, false, { message : errMsg });
           }
           if (!user.validPassword(password)) {
-            errMsg = 'Credentials do not match';
+            errMsg = 'Credentials don\'t match';
             console.log(errMsg.red);
             return done(null, false, { message : errMsg });
           }
@@ -112,7 +100,7 @@ module.exports = function(passport) {
       }
       if (user) {
         if (!user.validPassword(password)) {
-          errMsg = 'Credentials do not match';
+          errMsg = 'Credentials don\'t match';
           console.log(errMsg.red);
           return done(null, false, { message : errMsg });
         }

@@ -15,9 +15,11 @@ try {
   var cors            = require('cors');
   var app             = express();
   var db              = require('./config/db.js');
+  var auth            = require('./config/auth.js');
 
 // global config ---------------------------------------------------------------
   app.set('port', process.env.PORT || 3000);
+  app.set('jwtTokenSecret', auth.TOKEN_SECRET);
   app.set('views', __dirname + '/views');
   app.set('view engine', 'ejs');
   app.use(logger({
@@ -27,9 +29,9 @@ try {
   app.use(bodyParser.urlencoded({
     extended: true
   }));
-  app.use(bodyParser.json())
+  app.use(bodyParser.json());
   app.use(session({
-    secret            : 'auth-demo',
+    secret            : auth.SESSION_SECRET,
     saveUninitialized : true,
     resave            : true
   }));
