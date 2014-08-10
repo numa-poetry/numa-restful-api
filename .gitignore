@@ -33,5 +33,4 @@ node_modules
 
 ### Server ###
 logfile.txt
-auth.js
-db.js
+config

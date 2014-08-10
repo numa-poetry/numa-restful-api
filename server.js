@@ -14,7 +14,7 @@ try {
   var colors          = require('colors');
   var cors            = require('cors');
   var app             = express();
-  var db              = require('./db.js');
+  var db              = require('./config/db.js');
 
 // global config ---------------------------------------------------------------
   app.set('port', process.env.PORT || 3000);

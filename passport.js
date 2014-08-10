@@ -4,7 +4,7 @@
 var LocalStrategy  = require('passport-local').Strategy;
 var RedditStrategy = require('passport-reddit').Strategy;
 var GitHubStrategy = require('passport-github').Strategy;
-var auth           = require('./auth.js');
+var auth           = require('./config/auth.js');
 var userModel      = require('./models/user.js');
 var colors         = require('colors');
 
