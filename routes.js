@@ -8,25 +8,26 @@ var moment     = require('moment');
 var jwt        = require('jwt-simple');
 var expressJwt = require('express-jwt');
 var userModel  = require('./models/user.js');
+var auth       = require('./config/auth');
+
+var ENCRYPTION_KEY  = auth.ENCRYPTION_KEY;
+var ENCRYPTION_ALGO = auth.ENCRYPTION_ALGO;
 
 // security functions ----------------------------------------------------------
-var algorithm = 'aes128';
-var key       = 'key';
-
-function encrypt(key, text) {
-  var cipher    = crypto.createCipher(algorithm, key);
-  var encrypted = cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
-  return encrypted;
+function encrypt(text) {
+  var cipher        = crypto.createCipher(ENCRYPTION_KEY, ENCRYPTION_ALGO);
+  var encryptedText = cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
+  return encryptedText;
 }
 
-function decrypt(key, encrypted) {
-  var decipher  = crypto.createDecipher(algorithm, key);
-  var decrypted = decipher.update(encrypted, 'hex', 'utf8') + decipher.final('utf8');
-  return decrypted;
+function decrypt(encryptedText) {
+  var decipher      = crypto.createDecipher(ENCRYPTION_KEY, ENCRYPTION_ALGO);
+  var decryptedText = decipher.update(encryptedText, 'hex', 'utf8') + decipher.final('utf8');
+  return decryptedText;
 }
 
 function signToken(keepLoggedIn, jwtTokenSecret, userId) {
-  var expires, token;
+  var expires;
 
   if (keepLoggedIn) {
     expires = moment().add(2, 'weeks').valueOf();
@@ -35,7 +36,7 @@ function signToken(keepLoggedIn, jwtTokenSecret, userId) {
     expires = moment().add(1, 'hour').valueOf();
     console.log('short session token set'.yellow);
   }
-  token = jwt.encode({
+  var token = jwt.encode({
     'iss' : userId, // issuer (specifies entity making the request)
     'exp' : expires // expires (lifetime of token)
   }, jwtTokenSecret);
@@ -45,7 +46,7 @@ function signToken(keepLoggedIn, jwtTokenSecret, userId) {
 // routes ----------------------------------------------------------------------
 module.exports = function(app, passport) {
 
-  var jwtTokenSecret = app.get('jwtTokenSecret');
+  var JWT_TOKEN_SECRET = app.get('jwtTokenSecret');
 
   // Simple route middleware to ensure user is authenticated.
   //   Use this route middleware on any resource that needs to be protected.  If
@@ -104,9 +105,9 @@ module.exports = function(app, passport) {
       } 
       var resObj      = {};
       resObj.id       = user._id;
-      resObj.userName = user.local.userName;
+      resObj.username = user.local.username;
       resObj.email    = user.local.email;
-      resObj.token    = signToken(req.body.keepLoggedIn, jwtTokenSecret, user._id);
+      resObj.token    = signToken(req.body.keepLoggedIn, JWT_TOKEN_SECRET, user._id);
       console.log('resObj:', resObj);
       res.status(201).send(resObj);
     })(req, res);
@@ -137,12 +138,16 @@ module.exports = function(app, passport) {
       req.login(user, function(err) {
         if (err) {
           console.log(err);
+          res.status(500).send({
+            type    : 'internal_server_error',
+            message : 'The user could not be logged in.'
+          });
         }
         var resObj      = {};
         resObj.id       = user._id;
-        resObj.userName = user.local.userName;
+        resObj.username = user.local.username;
         resObj.email    = user.local.email;
-        resObj.token    = signToken(req.body.keepLoggedIn, jwtTokenSecret, user._id);
+        resObj.token    = signToken(req.body.keepLoggedIn, JWT_TOKEN_SECRET, user._id);
         console.log('resObj:', resObj);
         res.status(201).send(resObj);
       })
@@ -153,7 +158,7 @@ module.exports = function(app, passport) {
    * Local logout
    */
   app.get('/api/user/logout',
-    expressJwt({ secret : jwtTokenSecret }),
+    expressJwt({ secret : JWT_TOKEN_SECRET }),
     function(req, res) {
       console.log('\n[GET] /api/user/logout'.bold.green);
       console.log('Request body:'.green, req.body);
@@ -173,14 +178,14 @@ module.exports = function(app, passport) {
    * Delete user account
    */
   app.delete('/api/user/:id/',
-    expressJwt({ secret : jwtTokenSecret }),
+    expressJwt({ secret : JWT_TOKEN_SECRET }),
     function(req, res) {
       console.log('\n[GET] /api/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
         var token        = req.headers.authentication.split(' ')[1];
-        var decodedToken = jwt.decode(token, jwtTokenSecret);
+        var decodedToken = jwt.decode(token, JWT_TOKEN_SECRET);
 
         // verify user token is valid, not expired
         if (moment().valueOf() <= decodedToken.exp) {
