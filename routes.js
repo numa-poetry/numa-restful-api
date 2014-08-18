@@ -1,175 +1,262 @@
 'use strict';
 
 // modules ---------------------------------------------------------------------
-var passport   = require('./passport');
-var crypto     = require('crypto');
-var colors     = require('colors');
-var moment     = require('moment');
-var jwt        = require('jwt-simple');
-var expressJwt = require('express-jwt');
-var userModel  = require('./models/user.js');
-var auth       = require('./config/auth');
-
-var ENCRYPTION_KEY  = auth.ENCRYPTION_KEY;
-var ENCRYPTION_ALGO = auth.ENCRYPTION_ALGO;
-
-// security functions ----------------------------------------------------------
-function encrypt(text) {
-  var cipher        = crypto.createCipher(ENCRYPTION_KEY, ENCRYPTION_ALGO);
-  var encryptedText = cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
-  return encryptedText;
-}
-
-function decrypt(encryptedText) {
-  var decipher      = crypto.createDecipher(ENCRYPTION_KEY, ENCRYPTION_ALGO);
-  var decryptedText = decipher.update(encryptedText, 'hex', 'utf8') + decipher.final('utf8');
-  return decryptedText;
-}
-
-function signToken(keepLoggedIn, jwtTokenSecret, userId) {
-  var expires;
-
-  if (keepLoggedIn) {
-    expires = moment().add(2, 'weeks').valueOf();
-    console.log('long session token set'.yellow);
-  } else {
-    expires = moment().add(1, 'hour').valueOf();
-    console.log('short session token set'.yellow);
-  }
-  var token = jwt.encode({
-    'iss' : userId, // issuer (specifies entity making the request)
-    'exp' : expires // expires (lifetime of token)
-  }, jwtTokenSecret);
-  return token;
-}
+var crypto    = require('crypto');
+var colors    = require('colors');
+var moment    = require('moment');
+var jwt       = require('jwt-simple');
+var userModel = require('./models/user.js');
+var auth      = require('./config/auth');
 
 // routes ----------------------------------------------------------------------
-module.exports = function(app, passport) {
+module.exports = function(app) {
 
-  var JWT_TOKEN_SECRET = app.get('jwtTokenSecret');
-
-  // Simple route middleware to ensure user is authenticated.
-  //   Use this route middleware on any resource that needs to be protected.  If
-  //   the request is authenticated (typically via a persistent login session),
-  //   the request will proceed.  Otherwise, the user will be redirected to the
-  //   login page.
-  function ensureAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) { 
-      return next(); 
-    }
-    res.redirect('/login');
+  function encrypt(text) {
+    var cipher        = crypto.createCipher(auth.ENCRYPTION_KEY, auth.ENCRYPTION_ALGO);
+    var encryptedText = cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
+    return encryptedText;
   }
 
-  app.get('/', function(req, res){
-    console.log('\n[GET] /'.bold.green);
-    console.log('Request body:'.green, req.body);
-    res.render('index');
-  });
+  function decrypt(encryptedText) {
+    var decipher      = crypto.createDecipher(auth.ENCRYPTION_KEY, auth.ENCRYPTION_ALGO);
+    var decryptedText = decipher.update(encryptedText, 'hex', 'utf8') + decipher.final('utf8');
+    return decryptedText;
+  }
 
-  app.get('/profile', ensureAuthenticated, function(req, res){
-    console.log('\n[GET] /profile'.bold.green);
-    console.log('Request body:'.green, req.body);
-    res.render('profile', { 
-      user: JSON.stringify(req.user , undefined, 2)
-    });
-  });
+  function createToken(keepLoggedIn, user) {
+    var expires, payload;
 
-  app.get('/logout', function(req, res){
-    console.log('\n[GET] /logout'.bold.green);
-    console.log('Request body:'.green, req.body);
-    req.logout();
-    res.redirect('/');
-  });
+    if (keepLoggedIn) {
+      expires = moment().add(7, 'days').valueOf();
+      console.log('long session token set'.yellow);
+    } else {
+      expires = moment().add(1, 'hour').valueOf();
+      console.log('short session token set'.yellow);
+    }
+    payload = {
+      user  : user,
+      'iss' : user._id,           // issuer (specifies entity making the request)
+      'iat' : moment().valueOf(), // The iat (issued at) claim identifies the time at which the JWT was issued.
+      'exp' : expires             // expires (lifetime of token)
+    };
+    return jwt.encode(payload, auth.TOKEN_SECRET);
+  }
+
+  /**
+   * Middleware
+   */
+  function ensureAuthenticated(req, res, next) {
+    var errMsg;
+
+    if (!req.headers.authorization) {
+      errMsg = 'The user is not authorized to access this resource.'
+      console.log(errMsg.red);
+      res.status(401).send({
+        type    : 'unauthorized',
+        message : errMsg
+      });
+    } else {    
+      var token   = req.headers.authorization.split(' ')[1];
+      var payload = jwt.decode(token, auth.TOKEN_SECRET);
+
+      if (payload.exp <= Date.now()) {
+        errMsg = 'The user\'s session token has expired.'
+        console.log(errMsg.red);
+        res.status(498).send({
+          type    : 'token_expired',
+          message : errMsg
+        });
+      } else {
+        req.user = payload.user;
+        next();
+      }
+    }
+  }
 
   /**
    * Local signup
    */
-  app.post('/api/user/signup', function(req, res) {
-    console.log('\n[POST] /api/user/signup'.bold.green);
+  app.post('/v1/user/signup', function(req, res) {
+    console.log('\n[POST] /v1/user/signup'.bold.green);
     console.log('Request body:'.green, req.body);
 
-    passport.authenticate('local-signup', function(err, user, info) {
-      if (err) {
-        console.log(err);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be authenticated.'
-        });
-      } 
-      if (!user) {
-        console.log(err);
-        res.status(404).send({
-          type    : 'not_found',
-          message : 'The user could not be found.'
-        });
-      } 
-      var resObj      = {};
-      resObj.id       = user._id;
-      resObj.username = user.local.username;
-      resObj.email    = user.local.email;
-      resObj.token    = signToken(req.body.keepLoggedIn, JWT_TOKEN_SECRET, user._id);
-      console.log('resObj:', resObj);
-      res.status(201).send(resObj);
-    })(req, res);
+    try {
+      var errMsg;
+
+      // Verify username isn't taken
+      userModel.findOne({
+        'local.username' : req.body.username
+      }, function(err, user) {
+        if (err) {
+          console.log(err);
+          res.status(500).send({
+            type    : 'internal_server_error',
+            message : 'The user could not be signed up'
+          });
+        } else if (user) {
+          errMsg = 'This username is already taken.';
+          console.log(errMsg.red);
+          res.status(400).send({
+            type    : 'bad_request',
+            message : errMsg
+          });
+        } else {
+
+          // Verify email isn't taken
+          userModel.findOne({
+            'local.email' : req.body.email
+          }, function(err, user) {
+            if (err) {
+              console.log(err);
+              res.status(500).send({
+                type    : 'internal_server_error',
+                message : 'The user could not be signed up'
+              });
+            } else if (user) {
+              errMsg = 'This email is already taken.';
+              console.log(errMsg.red);
+              res.status(400).send({
+                type    : 'bad_request',
+                message : errMsg
+              });
+            } else {
+
+              // Build new user
+              var newUser             = new userModel();
+              newUser.local.username  = req.body.username;
+              newUser.local.email     = req.body.email;
+              newUser.local.password  = newUser.generateHash(req.body.password);
+              newUser.signupTimestamp = moment().valueOf();
+
+              // Save new user to the database
+              newUser.save(function(err) {
+                if (err) {
+                  console.log(err);
+                  res.status(500).send({
+                    type    : 'internal_server_error',
+                    message : err
+                  });
+                } else {
+                  newUser = newUser.toObject();
+                  delete newUser.local.password;
+                  var token = createToken(req.body.keepLoggedIn, newUser);
+                  res.status(201).send({
+                    id    : newUser._id,
+                    token : token
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    } catch (ex) {
+      console.log(ex);
+      res.status(500).send({
+        type    : 'internal_server_error',
+        message : 'The user could not be signed up in.'
+      });
+    }
   });
 
   /**
    * Local login
    */
-  app.post('/api/user/login', function(req, res) {
-    console.log('\n[POST] /api/user/login'.bold.green);
+  app.post('/v1/user/login', function(req, res) {
+    console.log('\n[POST] /v1/user/login'.bold.green);
     console.log('Request body:'.green, req.body);
 
-    passport.authenticate('local-login', function(err, user, info) {
-      if (err) {
-        console.log(err);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be authenticated.'
-        });
-      }
-      if (!user) {
-        console.log(err);
-        res.status(404).send({
-          type    : 'not_found',
-          message : 'The user could not be found.'
-        });
-      }
-      req.login(user, function(err) {
+    try {
+      var errMsg;
+
+      // Verify user exists
+      userModel.findOne({
+        'local.username' : req.body.username
+      }, function(err, user) {
         if (err) {
           console.log(err);
           res.status(500).send({
             type    : 'internal_server_error',
-            message : 'The user could not be logged in.'
+            message : err
+          });
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+
+          // Verify password matches
+          user.comparePassword(req.body.password, function(err, isMatch) {
+            if (isMatch) {
+              errMsg = 'Wrong email and/or password.';
+              console.log(errMsg.red);
+              res.status(400).send({
+                type    : 'bad_request',
+                message : errMsg
+              });
+            } else {
+              user = user.toObject();
+              delete user.password;
+              var token = createToken(req.body.keepLoggedIn, user);
+              res.status(201).send({
+                id   : user._id,
+                token : token
+              });
+            }
           });
         }
-        var resObj      = {};
-        resObj.id       = user._id;
-        resObj.username = user.local.username;
-        resObj.email    = user.local.email;
-        resObj.token    = signToken(req.body.keepLoggedIn, JWT_TOKEN_SECRET, user._id);
-        console.log('resObj:', resObj);
-        res.status(201).send(resObj);
-      })
-    })(req, res);
+      });
+    } catch (ex) {
+      console.log(ex);
+      res.status(500).send({
+        type    : 'internal_server_error',
+        message : 'The user could not be logged in.'
+      });
+    }
   });
 
   /**
-   * Local logout
+   * Get a user by id
    */
-  app.get('/api/user/logout',
-    expressJwt({ secret : JWT_TOKEN_SECRET }),
+  app.get('/v1/user/:id',
+    ensureAuthenticated,
     function(req, res) {
-      console.log('\n[GET] /api/user/logout'.bold.green);
+      console.log('\n[GET] /v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
-        req.logout();
+        var errMsg;
+
+        userModel.findById(req.user._id, function(err, user) {
+          if (err) {
+            console.log(err);
+            res.status(500).send({
+              type    : 'internal_server_error',
+              message : err
+            });
+          } else if (!user) {
+            errMsg = 'The user could not be found.';
+            console.log(errMsg.red);
+            res.status(404).send({
+              type    : 'not_found',
+              message : errMsg
+            });
+          } else {
+            res.status(200).send({
+              id       : user._id,
+              username : user.local.username,
+              email    : user.local.email                
+            });
+          }
+        });
       } catch (ex) {
         console.log(ex);
         res.status(500).send({
           type    : 'internal_server_error',
-          message : 'The user could not be logged out.'
+          message : 'The user could not be retrieved.'
         });
       }
     });
@@ -177,53 +264,43 @@ module.exports = function(app, passport) {
   /**
    * Delete user account
    */
-  app.delete('/api/user/:id/',
-    expressJwt({ secret : JWT_TOKEN_SECRET }),
+  app.delete('/v1/user/:id/',
+    ensureAuthenticated,
     function(req, res) {
-      console.log('\n[GET] /api/user/:id'.bold.green);
+      console.log('\n[DELETE] /v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
-        var token        = req.headers.authentication.split(' ')[1];
-        var decodedToken = jwt.decode(token, JWT_TOKEN_SECRET);
+        var errMsg, sucMsg;
 
-        // verify user token is valid, not expired
-        if (moment().valueOf() <= decodedToken.exp) {
-          var id = req.params.id;
-
-          userModel.findOneByIdAndRemove(id, function(err, user) {
-            if (err) {
-              console.log(err);
-              res.status(500).send({
-                type    : 'internal_server_error',
-                message : 'The user could not be deleted.'
-              });
-            }
-            if (!user) {
-              console.log('The user could not be found');
-              res.status(404).send({
-                type    : 'not_found',
-                message : 'The user could not be found.'
-              });
-            }
-            console.log('The user was deleted.');
-            res.status(204).send({
-              type    : 'success',
-              message : 'The user was deleted.'
+        userModel.findByIdAndRemove(req.user._id, function(err, user) {
+          if (err) {
+            console.log(err);
+            res.status(500).send({
+              type    : 'internal_server_error',
+              message : err
             });
-          })
-        } else {
-          console.log('The token is expired');
-          res.status(498).send({
-            type    : 'token_expired',
-            message : 'The token is expired.'
-          });
-        }
+          } else if (!user) {
+            errMsg = 'The user could not be found.';
+            console.log(errMsg.red);
+            res.status(404).send({
+              type    : 'not_found',
+              message : errMsg
+            });
+          } else {
+            sucMsg = 'The user was deleted.';
+            console.log(sucMsg.blue);
+            res.status(200).send({
+              type    : 'success',
+              message : sucMsg
+            });
+          }
+        });
       } catch (ex) {
         console.log(ex);
         res.status(500).send({
           type    : 'internal_server_error',
-          message : 'The user could not be deleted.'
+          message : 'The user could not be deleted'
         });
       }
     });
@@ -231,28 +308,28 @@ module.exports = function(app, passport) {
   /**
    * Get all users
    */
-  app.get('/api/user', function(req, res) {
-    console.log('\n[GET] /api/user'.bold.green);
+  app.get('/v1/user', function(req, res) {
+    console.log('\n[GET] /v1/user'.bold.green);
     console.log('Request body:'.green, req.body);
 
     try {
-      userModel.find(function(err, users) {
-        if (err) {
-          console.log(err);
-          res.status(500).send({
-            type    : 'internal_server_error',
-            message : 'All users could not be found.'
-          });
-        }
-        if (!users) {
-          console.log('All users could not be found');
-          res.status(404).send({
-            type    : 'not_found',
-            message : 'All users could not be found.'
-          });
-        }
-        res.status(200).send(users); // sanitize!!
-      });
+      // userModel.find(function(err, users) {
+      //   if (err) {
+      //     console.log(err);
+      //     res.status(500).send({
+      //       type    : 'internal_server_error',
+      //       message : 'All users could not be found.'
+      //     });
+      //   }
+      //   if (!users) {
+      //     console.log('All users could not be found');
+      //     res.status(404).send({
+      //       type    : 'not_found',
+      //       message : 'All users could not be found.'
+      //     });
+      //   }
+      //   res.status(200).send(users); // sanitize!!
+      // });
     } catch (ex) {
         console.log(ex);
         res.status(500).send({
@@ -260,48 +337,6 @@ module.exports = function(app, passport) {
           message : 'All users could not be retrieved.'
         });      
     }
-  })
-// Reddit authentication -------------------------------------------------------
-  app.get('/auth/reddit', function(req, res, next){
-    console.log('\n[GET] /auth/reddit'.bold.green);
-    console.log('Request body:'.green, req.body);
-    req.session.state = crypto.randomBytes(32).toString('hex');
-    passport.authenticate('reddit', {
-      state    : req.session.state,
-      // duration : 'permanent'
-    })(req, res, next);
-  });
-
-  app.get('/auth/reddit/callback', function(req, res, next){
-    console.log('\n[GET] /auth/reddit/callback'.bold.green);
-    console.log('Request body:'.green, req.body);
-    // Check for origin via state token
-    if (req.query.state == req.session.state){
-      passport.authenticate('reddit', {
-        successRedirect: '/profile',
-        failureRedirect: '/'
-      })(req, res, next);
-    }
-    else {
-      next( new Error(403) );
-    }
-  });
-
-// Github authentication -------------------------------------------------------
-  app.get('/auth/github', function(req, res, next){
-    console.log('\n[GET] /auth/github/'.bold.green);
-    console.log('Request body:'.green, req.body);
-    passport.authenticate('github', {
-    })(req, res, next);
-  });
-
-  app.get('/auth/github/callback', function(req, res, next){
-    console.log('\n[GET] /auth/github/callback'.bold.green);
-    console.log('Request body:'.green, req.body);
-    passport.authenticate('github', { 
-      successRedirect: '/profile',
-      failureRedirect: '/'
-    })(req, res, next);
   });
 
 };

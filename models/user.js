@@ -10,36 +10,19 @@ var SALT_FACTOR = 10;
  */
 var userSchema = new Schema({
 
+  signupTimestamp : Number,
+
   local : {
-    userName : String,
+    username : String,
     email    : String,
     password : String
   },
 
-  reddit : {
-    id       : String,
-    token    : String,
-    name     : String
-  },
-
-  github : {
-    id       : String,
-    token    : String,
-    username : String,
-    email    : String
-  }
-
 });
 
-/**
- * Encryption methods
- */
-userSchema.methods.comparePassword = function(candidatePassword, cb) {
-  bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
-    if (err) {
-      return cb(err);
-    }
-    cb(null, isMatch);
+userSchema.methods.comparePassword = function(password, done) {
+  bcrypt.compare(password, this.password, function(err, isMatch) {
+    done(err, isMatch);
   });
 };
 
@@ -50,5 +33,21 @@ userSchema.methods.generateHash = function(password) {
 userSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.local.password);
 };
+
+userSchema.pre('save', function(next) {
+  var user = this;
+  if (!user.isModified('password')) {
+    console.log('test');
+    return next();
+  }
+  bcrypt.genSalt(SALT_FACTOR, function(err, salt) {
+    console.log('here');
+    bcrypt.hash(user.local.password, salt, function(err, hash) {
+      console.log('here2');
+      user.local.password = hash;
+      next();
+    });
+  });
+});
 
 module.exports = mongoose.model('User', userSchema);
