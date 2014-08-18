@@ -48,28 +48,57 @@ module.exports = function(app) {
   function ensureAuthenticated(req, res, next) {
     var errMsg;
 
+    // Verify token is present in header
     if (!req.headers.authorization) {
-      errMsg = 'The user is not authorized to access this resource.'
+      errMsg = 'The user is not authorized to access this resource.';
       console.log(errMsg.red);
       res.status(401).send({
         type    : 'unauthorized',
         message : errMsg
       });
-    } else {    
-      var token   = req.headers.authorization.split(' ')[1];
-      var payload = jwt.decode(token, auth.TOKEN_SECRET);
+    } else {
 
-      if (payload.exp <= Date.now()) {
-        errMsg = 'The user\'s session token has expired.'
-        console.log(errMsg.red);
-        res.status(498).send({
-          type    : 'token_expired',
-          message : errMsg
-        });
-      } else {
-        req.user = payload.user;
-        next();
-      }
+      // Verify user exists
+      userModel.findById(req.params.id, function(err, user) {
+        if (err) {
+          console.log(err);
+          res.status(500).send({
+            type    : 'internal_server_error',
+            message : 'The user is not authorized to access this resource.'
+          });
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+
+          var token   = req.headers.authorization.split(' ')[1];
+          var payload = jwt.decode(token, auth.TOKEN_SECRET);
+
+          // Verify user is token issuer
+          if (payload.iss !== req.params.id) {
+            errMsg = 'The user is not the token issuer.';
+            console.log(errMsg.red);
+            res.status(401).send({
+              type    : 'unauthorized',
+              message : errMsg
+            });
+          } else if (payload.exp <= Date.now()) {
+            errMsg = 'The user\'s session token has expired.';
+            console.log(errMsg.red);
+            res.status(498).send({
+              type    : 'token_expired',
+              message : errMsg
+            });
+          } else {
+            req.user = user;
+            next();
+          }
+        }
+      });
     }
   }
 
@@ -228,29 +257,11 @@ module.exports = function(app) {
       console.log('Request body:'.green, req.body);
 
       try {
-        var errMsg;
-
-        userModel.findById(req.user._id, function(err, user) {
-          if (err) {
-            console.log(err);
-            res.status(500).send({
-              type    : 'internal_server_error',
-              message : err
-            });
-          } else if (!user) {
-            errMsg = 'The user could not be found.';
-            console.log(errMsg.red);
-            res.status(404).send({
-              type    : 'not_found',
-              message : errMsg
-            });
-          } else {
-            res.status(200).send({
-              id       : user._id,
-              username : user.local.username,
-              email    : user.local.email                
-            });
-          }
+        // req.user retrieved from ensureAuthenticated() middleware
+        res.status(200).send({
+          id       : req.user._id,
+          username : req.user.local.username,
+          email    : req.user.local.email
         });
       } catch (ex) {
         console.log(ex);
