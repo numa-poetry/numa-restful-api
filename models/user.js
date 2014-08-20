@@ -41,6 +41,17 @@ UserSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.local.password);
 };
 
+// Override
+UserSchema.methods.toJSON = function() {
+  var user = this.toObject();
+  delete user._id;
+  delete user.__v;
+  delete user.local.email;
+  delete user.local.password;
+  delete user.updatedAt;
+  return user;
+};
+
 /**
  * Serial middleware
  */

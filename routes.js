@@ -158,7 +158,6 @@ module.exports = function(app) {
 
               // Save new user to the database
               newUser.save(function(err) {
-                console.log('Creation timestamp:', newUser.createdAt);
                 if (err) {
                   console.log(err);
                   res.status(500).send({
@@ -248,7 +247,7 @@ module.exports = function(app) {
   });
 
   /**
-   * Get a user by id
+   * Get a user
    */
   app.get('/api/v1/user/:id',
     ensureAuthenticated,
@@ -273,7 +272,7 @@ module.exports = function(app) {
     });
 
   /**
-   * Delete user account
+   * Delete a user
    */
   app.delete('/api/v1/user/:id/',
     ensureAuthenticated,
@@ -289,7 +288,7 @@ module.exports = function(app) {
             console.log(err);
             res.status(500).send({
               type    : 'internal_server_error',
-              message : err
+              message : 'The user could not be deleted'
             });
           } else if (!user) {
             errMsg = 'The user could not be found.';
@@ -319,35 +318,39 @@ module.exports = function(app) {
   /**
    * Get all users
    */
-  app.get('/api/v1/user', function(req, res) {
-    console.log('\n[GET] /api/v1/user'.bold.green);
-    console.log('Request body:'.green, req.body);
+  app.get('/api/v1/user',
+    function(req, res) {
+      console.log('\n[GET] /api/v1/user'.bold.green);
+      console.log('Request body:'.green, req.body);
 
-    try {
-      // UserModel.find(function(err, users) {
-      //   if (err) {
-      //     console.log(err);
-      //     res.status(500).send({
-      //       type    : 'internal_server_error',
-      //       message : 'All users could not be found.'
-      //     });
-      //   }
-      //   if (!users) {
-      //     console.log('All users could not be found');
-      //     res.status(404).send({
-      //       type    : 'not_found',
-      //       message : 'All users could not be found.'
-      //     });
-      //   }
-      //   res.status(200).send(users); // sanitize!!
-      // });
-    } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'All users could not be retrieved.'
-        });      
-    }
-  });
+      try {
+        var errMsg;
+
+        UserModel.find(function(err, users) {
+          if (err) {
+            console.log(err);
+            res.status(500).send({
+              type    : 'internal_server_error',
+              message : 'All users could not be retrieved.'
+            });
+          }
+          if (!users) {
+            errMsg = 'All users could not be found';
+            console.log(errMsg.red);
+            res.status(404).send({
+              type    : 'not_found',
+              message : errMsg
+            });
+          }
+          res.status(200).send(users); // sanitize!!
+        });
+      } catch (ex) {
+          console.log(ex);
+          res.status(500).send({
+            type    : 'internal_server_error',
+            message : 'All users could not be retrieved.'
+          });      
+      }
+    });
 
 };
