@@ -3,14 +3,13 @@
 var mongoose    = require('mongoose');
 var Schema      = mongoose.Schema;
 var bcrypt      = require('bcrypt-nodejs');
+var timestamps  = require('mongoose-timestamp');
 var SALT_FACTOR = 10;
 
 /**
  * User Schema
  */
-var userSchema = new Schema({
-
-  signupTimestamp : Number,
+var UserSchema = new Schema({
 
   local : {
     username : String,
@@ -20,34 +19,42 @@ var userSchema = new Schema({
 
 });
 
-userSchema.methods.comparePassword = function(password, done) {
+/**
+ * Plugins
+ */
+UserSchema.plugin(timestamps);
+
+/**
+ * Model methods
+ */
+UserSchema.methods.comparePassword = function(password, done) {
   bcrypt.compare(password, this.password, function(err, isMatch) {
     done(err, isMatch);
   });
 };
 
-userSchema.methods.generateHash = function(password) {
+UserSchema.methods.generateHash = function(password) {
   return bcrypt.hashSync(password, bcrypt.genSaltSync(SALT_FACTOR), null);
 };
 
-userSchema.methods.validPassword = function(password) {
+UserSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.local.password);
 };
 
-userSchema.pre('save', function(next) {
+/**
+ * Serial middleware
+ */
+UserSchema.pre('save', function(next) {
   var user = this;
   if (!user.isModified('password')) {
-    console.log('test');
     return next();
   }
   bcrypt.genSalt(SALT_FACTOR, function(err, salt) {
-    console.log('here');
     bcrypt.hash(user.local.password, salt, function(err, hash) {
-      console.log('here2');
       user.local.password = hash;
       next();
     });
   });
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', UserSchema);

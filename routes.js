@@ -5,7 +5,7 @@ var crypto    = require('crypto');
 var colors    = require('colors');
 var moment    = require('moment');
 var jwt       = require('jwt-simple');
-var userModel = require('./models/user.js');
+var UserModel = require('./models/user.js');
 var auth      = require('./config/auth');
 
 // routes ----------------------------------------------------------------------
@@ -59,7 +59,7 @@ module.exports = function(app) {
     } else {
 
       // Verify user exists
-      userModel.findById(req.params.id, function(err, user) {
+      UserModel.findById(req.params.id, function(err, user) {
         if (err) {
           console.log(err);
           res.status(500).send({
@@ -105,15 +105,15 @@ module.exports = function(app) {
   /**
    * Local signup
    */
-  app.post('/v1/user/signup', function(req, res) {
-    console.log('\n[POST] /v1/user/signup'.bold.green);
+  app.post('/api/v1/user/signup', function(req, res) {
+    console.log('\n[POST] /api/v1/user/signup'.bold.green);
     console.log('Request body:'.green, req.body);
 
     try {
       var errMsg;
 
       // Verify username isn't taken
-      userModel.findOne({
+      UserModel.findOne({
         'local.username' : req.body.username
       }, function(err, user) {
         if (err) {
@@ -132,7 +132,7 @@ module.exports = function(app) {
         } else {
 
           // Verify email isn't taken
-          userModel.findOne({
+          UserModel.findOne({
             'local.email' : req.body.email
           }, function(err, user) {
             if (err) {
@@ -151,14 +151,14 @@ module.exports = function(app) {
             } else {
 
               // Build new user
-              var newUser             = new userModel();
+              var newUser             = new UserModel();
               newUser.local.username  = req.body.username;
               newUser.local.email     = req.body.email;
               newUser.local.password  = newUser.generateHash(req.body.password);
-              newUser.signupTimestamp = moment().valueOf();
 
               // Save new user to the database
               newUser.save(function(err) {
+                console.log('Creation timestamp:', newUser.createdAt);
                 if (err) {
                   console.log(err);
                   res.status(500).send({
@@ -191,15 +191,15 @@ module.exports = function(app) {
   /**
    * Local login
    */
-  app.post('/v1/user/login', function(req, res) {
-    console.log('\n[POST] /v1/user/login'.bold.green);
+  app.post('/api/v1/user/login', function(req, res) {
+    console.log('\n[POST] /api/v1/user/login'.bold.green);
     console.log('Request body:'.green, req.body);
 
     try {
       var errMsg;
 
       // Verify user exists
-      userModel.findOne({
+      UserModel.findOne({
         'local.username' : req.body.username
       }, function(err, user) {
         if (err) {
@@ -250,10 +250,10 @@ module.exports = function(app) {
   /**
    * Get a user by id
    */
-  app.get('/v1/user/:id',
+  app.get('/api/v1/user/:id',
     ensureAuthenticated,
     function(req, res) {
-      console.log('\n[GET] /v1/user/:id'.bold.green);
+      console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
@@ -275,16 +275,16 @@ module.exports = function(app) {
   /**
    * Delete user account
    */
-  app.delete('/v1/user/:id/',
+  app.delete('/api/v1/user/:id/',
     ensureAuthenticated,
     function(req, res) {
-      console.log('\n[DELETE] /v1/user/:id'.bold.green);
+      console.log('\n[DELETE] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
         var errMsg, sucMsg;
 
-        userModel.findByIdAndRemove(req.user._id, function(err, user) {
+        UserModel.findByIdAndRemove(req.user._id, function(err, user) {
           if (err) {
             console.log(err);
             res.status(500).send({
@@ -319,12 +319,12 @@ module.exports = function(app) {
   /**
    * Get all users
    */
-  app.get('/v1/user', function(req, res) {
-    console.log('\n[GET] /v1/user'.bold.green);
+  app.get('/api/v1/user', function(req, res) {
+    console.log('\n[GET] /api/v1/user'.bold.green);
     console.log('Request body:'.green, req.body);
 
     try {
-      // userModel.find(function(err, users) {
+      // UserModel.find(function(err, users) {
       //   if (err) {
       //     console.log(err);
       //     res.status(500).send({

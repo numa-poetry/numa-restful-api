@@ -32,6 +32,7 @@ try {
 // env config ------------------------------------------------------------------
   if (process.env.NODE_ENV === 'development') {
     app.use(errorhandler());
+    // mongoose.set('debug', true);
   }
 
   if (process.env.NODE_ENV === 'production') {
