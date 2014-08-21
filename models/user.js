@@ -63,8 +63,10 @@ UserSchema.methods.incLoginAttempts = function(cb) {
       $unset: { lockUntil: 1 }
     }, cb);
   }
+  
   // otherwise we're incrementing
   var updates = { $inc: { loginAttempts: 1 } };
+
   // lock the account if we've reached max attempts and it's not locked already
   if (this.loginAttempts + 1 >= MAX_LOGIN_ATTEMPTS && !this.isLocked) {
     updates.$set = { lockUntil: Date.now() + LOCK_TIME };
@@ -90,7 +92,6 @@ UserSchema.methods.toJSON = function() {
  */
 
 // Expose enum on the model, and provide an internal convenience reference
-// http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
 var reasons = UserSchema.statics.failedLogin = {
   NOT_FOUND: 0,
   PASSWORD_INCORRECT: 1,
@@ -99,33 +100,33 @@ var reasons = UserSchema.statics.failedLogin = {
 
 UserSchema.statics.getAuthenticated = function(username, password, cb) {
   
-  console.log('username:', username);
-  console.log('password:', password);
+  // console.log('username:', username);
+  // console.log('password:', password);
 
   this.findOne({
     'local.username': username
   }, function(err, user) {
     if (err) {
-      console.log('1')
+      // console.log('1')
       return cb(err);
     }
 
     // make sure user exists
     if (!user) {
-      console.log('2');
+      // console.log('2');
       return cb(null, null, reasons.NOT_FOUND);
     }
 
     // check if the account is currently locked
     if (user.isLocked) {
-      console.log('3');
+      // console.log('3');
       // just increment login attempts if account is already locked
       return user.incLoginAttempts(function(err) {
         if (err) {
-          console.log('4')
+          // console.log('4')
           return cb(err);
         }
-        console.log('5')
+        // console.log('5')
         return cb(null, null, reasons.MAX_ATTEMPTS);
       });
     }
@@ -133,16 +134,16 @@ UserSchema.statics.getAuthenticated = function(username, password, cb) {
     // test for a matching password
     user.comparePassword(password, function(err, isMatch) {
       if (err) {
-        console.log('6')
+        // console.log('6')
         return cb(err);
       }
 
       // check if the password was a match
       if (isMatch) {
-        console.log('7')
+        // console.log('7')
         // if there's no lock or failed attempts, just return the user
         if (!user.loginAttempts && !user.lockUntil) {
-          console.log('8')
+          // console.log('8')
           return cb(null, user);
         }
 
@@ -162,10 +163,10 @@ UserSchema.statics.getAuthenticated = function(username, password, cb) {
       // password is incorrect, so increment login attempts before responding
       user.incLoginAttempts(function(err) {
         if (err) {
-          console.log('9')
+          // console.log('9')
           return cb(err);
         }
-        console.log('10')
+        // console.log('10')
         return cb(null, null, reasons.PASSWORD_INCORRECT);
       });
     });

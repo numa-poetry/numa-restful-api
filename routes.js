@@ -195,67 +195,55 @@ module.exports = function(app) {
     console.log('Request body:'.green, req.body);
 
     try {
+      var errMsg;
 
+      // http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
       UserModel.getAuthenticated(req.body.username, req.body.password,
         function(err, user, reason) {
           if (err) {
-            console.log(err);
-            // throw err;
-          }
+            throw err;
+          } else if (user) {
+            console.log('login successful'.green);
+            user = user.toObject();
+            delete user.password;
+            var token = createToken(req.body.keepLoggedIn, user);
+            res.status(201).send({
+              id   : user._id,
+              token : token
+            });
+          } else {
 
-          // login was successful if we have a user
-          if (user) {
-            // handle login success
-            console.log('login success');
+            // otherwise we can determine why we failed
+            var reasons = UserModel.failedLogin;
+            switch (reason) {
+              case reasons.NOT_FOUND:
+                errMsg = 'The user could not be found.';
+                console.log(errMsg.red);
+                res.status(404).send({
+                  type    : 'not_found',
+                  message : errMsg
+                });
+                break;
+              case reasons.PASSWORD_INCORRECT:
+                errMsg = 'Wrong username and/or password.';
+                console.log(errMsg.red);
+                res.status(400).send({
+                  type    : 'bad_request',
+                  message : errMsg
+                });
+                break;
+              case reasons.MAX_ATTEMPTS:
+                errMsg = 'Maximum failed login attempts reached. Please try again later.';
+                console.log(errMsg.red);
+                res.status(403).send({
+                  type    : 'forbidden',
+                  message : errMsg
+                });
+                break;
+            }
           }
-
-          // otherwise we can determine why we failed
-          console.log(reason);
         }
       );
-
-      // var errMsg;
-
-      // Verify user exists
-      // UserModel.findOne({
-      //   'local.username' : req.body.username
-      // }, function(err, user) {
-      //   if (err) {
-      //     console.log(err);
-      //     res.status(500).send({
-      //       type    : 'internal_server_error',
-      //       message : err
-      //     });
-      //   } else if (!user) {
-      //     errMsg = 'The user could not be found.';
-      //     console.log(errMsg.red);
-      //     res.status(404).send({
-      //       type    : 'not_found',
-      //       message : errMsg
-      //     });
-      //   } else {
-
-          // Verify password matches
-      //     user.comparePassword(req.body.password, function(err, isMatch) {
-      //       if (isMatch) {
-      //         errMsg = 'Wrong email and/or password.';
-      //         console.log(errMsg.red);
-      //         res.status(400).send({
-      //           type    : 'bad_request',
-      //           message : errMsg
-      //         });
-      //       } else {
-      //         user = user.toObject();
-      //         delete user.password;
-      //         var token = createToken(req.body.keepLoggedIn, user);
-      //         res.status(201).send({
-      //           id   : user._id,
-      //           token : token
-      //         });
-      //       }
-      //     });
-      //   }
-      // });
     } catch (ex) {
       console.log(ex);
       res.status(500).send({
