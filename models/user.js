@@ -7,14 +7,13 @@ var timestamps         = require('mongoose-timestamp');
 var SALT_WORK_FACTOR   = 10;
 var MAX_LOGIN_ATTEMPTS = 5;
 var LOCK_TIME          = 2 * 60 * 60 * 1000; // 2 hour lock
-/**
- * User Schema
- */
+
+// schema ----------------------------------------------------------------------
 var UserSchema = new Schema({
 
   local: {
-    username: { type: String, required: true, index: { unique: true } },
-    email: { type: String },
+    username: { type: String, trim: true, required: true, index: { unique: true } },
+    email: { type: String, trim: true },
     password: { type: String, required: true }
   },
   loginAttempts: { type: Number, required: true, default: 0 },
@@ -22,22 +21,15 @@ var UserSchema = new Schema({
 
 });
 
-/**
- * Virtuals
- */
 UserSchema.virtual('isLocked').get(function() {
   // check for a future lockUntil timestamp
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
-/**
- * Plugins
- */
+// plugins ---------------------------------------------------------------------
 UserSchema.plugin(timestamps);
 
-/**
- * Methods
- */
+// methods ---------------------------------------------------------------------
 UserSchema.methods.comparePassword = function(candidatePassword, cb) {
   bcrypt.compare(candidatePassword, this.local.password, function(err, isMatch) {
     if (err) {
@@ -74,9 +66,6 @@ UserSchema.methods.incLoginAttempts = function(cb) {
   return this.update(updates, cb);
 };
 
-/**
- * Overrides
- */
 UserSchema.methods.toJSON = function() {
   var user = this.toObject();
   delete user._id;
@@ -87,10 +76,7 @@ UserSchema.methods.toJSON = function() {
   return user;
 };
 
-/**
- * Statics
- */
-
+// statics ---------------------------------------------------------------------
 // Expose enum on the model, and provide an internal convenience reference
 var reasons = UserSchema.statics.failedLogin = {
   NOT_FOUND: 0,
