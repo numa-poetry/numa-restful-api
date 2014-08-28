@@ -11,11 +11,16 @@ var LOCK_TIME          = 60 * 60 * 1000; // 1 hour lock (ms)
 // schema ----------------------------------------------------------------------
 var UserSchema = new Schema({
 
+  github: String,
+
+  displayName: String,
+
   local: {
-    username: { type: String, trim: true, required: true, index: { unique: true } },
+    username: { type: String, trim: true, index: { unique: true } },
     email: { type: String, trim: true },
-    password: { type: String, required: true }
+    password: { type: String }
   },
+
   loginAttempts: { type: Number, required: true, default: 0 },
   lockUntil: { type: Number }
 
@@ -55,7 +60,7 @@ UserSchema.methods.incLoginAttempts = function(cb) {
       $unset: { lockUntil: 1 }
     }, cb);
   }
-  
+
   // otherwise we're incrementing
   var updates = { $inc: { loginAttempts: 1 } };
 
@@ -67,15 +72,15 @@ UserSchema.methods.incLoginAttempts = function(cb) {
 };
 
 // Sanitize
-UserSchema.methods.toJSON = function() {
-  var user = this.toObject();
-  delete user._id;
-  delete user.__v;
-  delete user.local.email;
-  delete user.local.password;
-  delete user.updatedAt;
-  return user;
-};
+// UserSchema.methods.toJSON = function() {
+//   var user = this.toObject();
+//   delete user._id;
+//   delete user.__v;
+//   delete user.local.email;
+//   delete user.local.password;
+//   delete user.updatedAt;
+//   return user;
+// };
 
 // statics ---------------------------------------------------------------------
 // Expose enum on the model, and provide an internal convenience reference
@@ -86,7 +91,7 @@ var reasons = UserSchema.statics.failedLogin = {
 };
 
 UserSchema.statics.getAuthenticated = function(username, password, cb) {
-  
+
 
   this.findOne({
     'local.username': username

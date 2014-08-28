@@ -5,6 +5,8 @@ var crypto    = require('crypto');
 var colors    = require('colors');
 var moment    = require('moment');
 var jwt       = require('jwt-simple');
+var request   = require('request');
+var qs        = require('querystring');
 var UserModel = require('./models/user.js');
 var auth      = require('./config/auth');
 
@@ -253,6 +255,121 @@ module.exports = function(app) {
       }
     }
   );
+
+  /**
+   * Login with Github
+   */
+  app.post('/auth/github',
+    function(req, res) {
+      console.log('\n[POST] /auth/github'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var accessTokenUrl = 'https://github.com/login/oauth/access_token';
+      var userApiUrl     = 'https://api.github.com/user';
+
+      var params = {
+        client_id     : req.body.clientId,
+        redirect_uri  : req.body.redirectUri,
+        code          : req.body.code,
+        client_secret : auth.github.CLIENT_SECRET
+      };
+
+      // Step 1. Exchange authorization code for access token.
+      request.get({ url: accessTokenUrl, qs: params }, function(err, response, accessToken) {
+        accessToken = qs.parse(accessToken);
+
+        var headers = { 'User-Agent': 'warrior-poets' };
+
+        // Step 2. Retrieve profile information about the current user.
+        request.get({ url: userApiUrl, qs: accessToken, headers: headers, json: true }, function(err, response, profile) {
+
+          // Step 3a. If user is already signed in then link accounts.
+          if (req.headers.authorization) {
+            UserModel.findOne({ github: profile.id }, function(err, existingUser) {
+              if (existingUser) {
+                return res.status(409).send({ message: 'There is already a GitHub account that belongs to you' });
+              } else {
+                var token   = req.headers.authorization.split(' ')[1];
+                var payload = jwt.decode(token, auth.TOKEN_SECRET);
+
+                UserModel.findById(payload.sub, function(err, user) {
+                  if (!user) {
+                    console.log('3a no user found');
+                    return res.status(400).send({ message: 'User not found' });
+                  } else {
+
+                    user.github      = profile.id;
+                    user.displayName = user.displayName || profile.name;
+                    console.log('3a user found:', user);
+                    // user.save(function(err) {
+                    //   res.send({ token: createToken(req, user) });
+                    // });
+
+                    user.save(function(err) {
+                      if (err) {
+                        console.log(err);
+                        res.status(500).send({
+                          type    : 'internal_server_error',
+                          message : err
+                        });
+                      } else {
+                        var token = createToken(undefined /* keepLoggedIn */, user);
+                        res.status(200).send({
+                          id       : user._id,
+                          token    : token,
+                          username : user.displayName
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          } else {
+            // Step 3b. Create a new user account or return an existing one.
+            UserModel.findOne({ github: profile.id }, function(err, existingUser) {
+              if (existingUser) {
+                console.log('3b Existing user');
+                // return res.send({ token: createToken(req, existingUser) });
+
+                var token = createToken(undefined /* keepLoggedIn */, existingUser);
+                res.status(200).send({
+                  id       : existingUser._id,
+                  token    : token,
+                  username : existingUser.displayName
+                });
+              } else {
+                var newUser         = new UserModel();
+                newUser.github      = profile.id;
+                newUser.displayName = profile.name;
+                // newUser.save(function(err) {
+                //   res.send({ token: createToken(req, user) });
+                // });
+
+                newUser.save(function(err) {
+                  if (err) {
+                    console.log(err);
+                    res.status(500).send({
+                      type    : 'internal_server_error',
+                      message : err
+                    });
+                  } else {
+                    console.log('new:', newUser);
+                    var token = createToken(undefined /* keepLoggedIn */, newUser);
+                    res.status(201).send({
+                      id       : newUser._id,
+                      token    : token,
+                      username : newUser.displayName
+                    });
+                  }
+                });
+                console.log('3b new user:', newUser);
+              }
+            });
+          }
+        });
+      });
+    });
 
   /**
    * Get a user
