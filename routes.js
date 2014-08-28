@@ -355,11 +355,11 @@ module.exports = function(app) {
           res.status(200).send(users);
         });
       } catch (ex) {
-          console.log(ex);
-          res.status(500).send({
-            type    : 'internal_server_error',
-            message : 'All users could not be retrieved.'
-          });
+        console.log(ex);
+        res.status(500).send({
+          type    : 'internal_server_error',
+          message : 'All users could not be retrieved.'
+        });
       }
     }
   );
