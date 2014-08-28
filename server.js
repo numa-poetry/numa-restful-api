@@ -5,11 +5,9 @@ try {
 // modules ---------------------------------------------------------------------
   var express      = require('express');
   var logger       = require('express-logger');
-  var passport     = require('passport');
   var mongoose     = require('mongoose');
   var bodyParser   = require('body-parser');
   var cookieParser = require('cookie-parser');
-  var session      = require('express-session');
   var errorhandler = require('errorhandler');
   var colors       = require('colors');
   var cors         = require('cors');

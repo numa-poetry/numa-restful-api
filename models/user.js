@@ -6,7 +6,7 @@ var bcrypt             = require('bcrypt-nodejs');
 var timestamps         = require('mongoose-timestamp');
 var SALT_WORK_FACTOR   = 10;
 var MAX_LOGIN_ATTEMPTS = 5;
-var LOCK_TIME          = 2 * 60 * 60 * 1000; // 2 hour lock
+var LOCK_TIME          = 60 * 60 * 1000; // 1 hour lock (ms)
 
 // schema ----------------------------------------------------------------------
 var UserSchema = new Schema({
@@ -66,6 +66,7 @@ UserSchema.methods.incLoginAttempts = function(cb) {
   return this.update(updates, cb);
 };
 
+// Sanitize
 UserSchema.methods.toJSON = function() {
   var user = this.toObject();
   delete user._id;
@@ -79,40 +80,33 @@ UserSchema.methods.toJSON = function() {
 // statics ---------------------------------------------------------------------
 // Expose enum on the model, and provide an internal convenience reference
 var reasons = UserSchema.statics.failedLogin = {
-  NOT_FOUND: 0,
-  PASSWORD_INCORRECT: 1,
-  MAX_ATTEMPTS: 2
+  NOT_FOUND          : 0,
+  PASSWORD_INCORRECT : 1,
+  MAX_ATTEMPTS       : 2
 };
 
 UserSchema.statics.getAuthenticated = function(username, password, cb) {
   
-  // console.log('username:', username);
-  // console.log('password:', password);
 
   this.findOne({
     'local.username': username
   }, function(err, user) {
     if (err) {
-      // console.log('1')
       return cb(err);
     }
 
     // make sure user exists
     if (!user) {
-      // console.log('2');
       return cb(null, null, reasons.NOT_FOUND);
     }
 
     // check if the account is currently locked
     if (user.isLocked) {
-      // console.log('3');
       // just increment login attempts if account is already locked
       return user.incLoginAttempts(function(err) {
         if (err) {
-          // console.log('4')
           return cb(err);
         }
-        // console.log('5')
         return cb(null, null, reasons.MAX_ATTEMPTS);
       });
     }
@@ -120,16 +114,13 @@ UserSchema.statics.getAuthenticated = function(username, password, cb) {
     // test for a matching password
     user.comparePassword(password, function(err, isMatch) {
       if (err) {
-        // console.log('6')
         return cb(err);
       }
 
       // check if the password was a match
       if (isMatch) {
-        // console.log('7')
         // if there's no lock or failed attempts, just return the user
         if (!user.loginAttempts && !user.lockUntil) {
-          // console.log('8')
           return cb(null, user);
         }
 
@@ -149,31 +140,12 @@ UserSchema.statics.getAuthenticated = function(username, password, cb) {
       // password is incorrect, so increment login attempts before responding
       user.incLoginAttempts(function(err) {
         if (err) {
-          // console.log('9')
           return cb(err);
         }
-        // console.log('10')
         return cb(null, null, reasons.PASSWORD_INCORRECT);
       });
     });
   });
 };
-
-/**
- * Middleware
- */
-// UserSchema.pre('save', function(next) {
-//   var user = this;
-
-//   if (!user.isModified('password')) {
-//     return next();
-//   }
-//   bcrypt.genSalt(SALT_WORK_FACTOR, function(err, salt) {
-//     bcrypt.hash(user.local.password, salt, function(err, hash) {
-//       user.local.password = hash;
-//       next();
-//     });
-//   });
-// });
 
 module.exports = mongoose.model('User', UserSchema);

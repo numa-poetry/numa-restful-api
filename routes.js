@@ -102,9 +102,9 @@ module.exports = function(app) {
   /**
    * Local signup
    */
-  app.post('/api/v1/user/signup',
+  app.post('/api/v1/signup',
     function(req, res) {
-      console.log('\n[POST] /api/v1/user/signup'.bold.green);
+      console.log('\n[POST] /api/v1/signup'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
@@ -189,9 +189,9 @@ module.exports = function(app) {
   /**
    * Local login
    */
-  app.post('/api/v1/user/login',
+  app.post('/api/v1/login',
     function(req, res) {
-      console.log('\n[POST] /api/v1/user/login'.bold.green);
+      console.log('\n[POST] /api/v1/login'.bold.green);
       console.log('Request body:'.green, req.body);
 
       try {
@@ -352,7 +352,7 @@ module.exports = function(app) {
               message : errMsg
             });
           }
-          res.status(200).send(users); // sanitize!!
+          res.status(200).send(users);
         });
       } catch (ex) {
           console.log(ex);
