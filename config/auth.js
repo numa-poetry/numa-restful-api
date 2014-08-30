@@ -2,6 +2,10 @@
 
 module.exports = {
 
+  'facebook' : {
+    'CLIENT_SECRET' : '038d961c66fbd44f775c551b52148dc7'
+  },
+
   'reddit' : {
     'CLIENT_SECRET' : '1I_T_MbVEk8cQu7SxYsuj-xPUJ4'
   },
