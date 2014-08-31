@@ -11,21 +11,9 @@ var LOCK_TIME          = 60 * 60 * 1000; // 1 hour lock (ms)
 // schema ----------------------------------------------------------------------
 var UserSchema = new Schema({
 
-  github: {
-    id: { type: String },
-    email: { type: String }
-  },
-
-  google: {
-    id: { type: String },
-    email: { type: String }
-  },
-
-  facebook: {
-    id: { type: String },
-    email: { type: String }
-  },
-
+  github: { type: String },
+  google: { type: String },
+  facebook: { type: String },
   displayName: { type: String },
 
   local: {

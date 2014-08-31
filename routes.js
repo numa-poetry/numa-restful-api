@@ -284,7 +284,7 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'facebook.id': profile.id }, function(err, existingUser) {
+            UserModel.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a Facebook account that belongs to you' });
               } else {
@@ -296,10 +296,7 @@ module.exports = function(app) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
-                    var facebook     = {};
-                    facebook.id      = profile.id;
-                    facebook.email   = profile.email;
-                    user.facebook    = facebook;
+                    user.facebook    = profile.id;
                     user.displayName = user.displayName || profile.name;
 
                     user.save(function(err) {
@@ -326,7 +323,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'facebook.id': profile.id }, function(err, existingUser) {
+            UserModel.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
@@ -338,10 +335,7 @@ module.exports = function(app) {
               } else {
                 console.log('3b new user');
                 var newUser         = new UserModel();
-                var facebook        = {};
-                facebook.id         = profile.id;
-                facebook.email      = profile.email;
-                newUser.facebook    = facebook;
+                newUser.facebook    = profile.id;
                 newUser.displayName = profile.name;
 
                 newUser.save(function(err) {
@@ -356,7 +350,7 @@ module.exports = function(app) {
                     res.status(201).send({
                       id       : newUser._id,
                       token    : token,
-                      username : newUser.facebook.displayName
+                      username : newUser.displayName
                     });
                   }
                 });
@@ -396,7 +390,7 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'github.id': profile.id }, function(err, existingUser) {
+            UserModel.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a GitHub account that belongs to you' });
               } else {
@@ -407,10 +401,7 @@ module.exports = function(app) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
-                    var github       = {};
-                    github.id        = profile.id;
-                    github.email     = profile.email;
-                    user.github      = github;
+                    user.github      = profile.id;
                     user.displayName = user.displayName || profile.name;
 
                     user.save(function(err) {
@@ -437,7 +428,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'github.id': profile.id }, function(err, existingUser) {
+            UserModel.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
@@ -449,10 +440,7 @@ module.exports = function(app) {
               } else {
                 console.log('3b new user');
                 var newUser         = new UserModel();
-                var github          = {};
-                github.id           = profile.id;
-                github.email        = profile.email;
-                newUser.github      = github;
+                newUser.github      = profile.id;
                 newUser.displayName = profile.name;
 
                 newUser.save(function(err) {
@@ -508,7 +496,7 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'google.id': profile.sub }, function(err, existingUser) {
+            UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a Google account that belongs to you' });
               } else {
@@ -519,10 +507,7 @@ module.exports = function(app) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   }
-                  var google       = {};
-                  google.id        = profile.sub;
-                  google.email     = profile.email;
-                  user.google      = google;
+                  user.google      = profile.sub;;
                   user.displayName = user.displayName || profile.name;
 
                   user.save(function(err) {
@@ -548,7 +533,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'google.id': profile.sub }, function(err, existingUser) {
+            UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existingUser');
                 // return res.send({ token: createToken(req, existingUser) });
@@ -561,10 +546,7 @@ module.exports = function(app) {
               } else {
                 console.log('3b new user');
                 var newUser         = new UserModel();
-                var google          = {};
-                google.id           = profile.sub;
-                google.email        = profile.email;
-                newUser.google      = google;
+                newUser.google      = profile.sub;
                 newUser.displayName = profile.name;
 
                 newUser.save(function(err) {
