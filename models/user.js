@@ -14,10 +14,11 @@ var UserSchema = new Schema({
   github: { type: String },
   google: { type: String },
   facebook: { type: String },
+
   displayName: { type: String },
 
   local: {
-    username: { type: String, unique: true, trim: true },
+    displayName: { type: String, unique: true, trim: true },
     email: { type: String, unique: true, trim: true },
     password: { type: String }
   },
@@ -91,11 +92,11 @@ var reasons = UserSchema.statics.failedLogin = {
   MAX_ATTEMPTS       : 2
 };
 
-UserSchema.statics.getAuthenticated = function(username, password, cb) {
+UserSchema.statics.getAuthenticated = function(displayName, password, cb) {
 
 
   this.findOne({
-    'local.username': username
+    'local.displayName': displayName
   }, function(err, user) {
     if (err) {
       return cb(err);

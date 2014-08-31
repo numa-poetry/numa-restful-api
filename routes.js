@@ -113,9 +113,9 @@ module.exports = function(app) {
       try {
         var errMsg;
 
-        // Verify username isn't taken
+        // Verify displayName isn't taken
         UserModel.findOne({
-          'local.username' : req.body.username
+          'local.displayName' : req.body.displayName
         }, function(err, user) {
           if (err) {
             console.log(err);
@@ -152,10 +152,10 @@ module.exports = function(app) {
               } else {
 
                 // Build new user
-                var newUser             = new UserModel();
-                newUser.local.username  = req.body.username;
-                newUser.local.email     = req.body.email;
-                newUser.local.password  = newUser.generateHash(req.body.password);
+                var newUser               = new UserModel();
+                newUser.local.displayName = req.body.displayName;
+                newUser.local.email       = req.body.email;
+                newUser.local.password    = newUser.generateHash(req.body.password);
 
                 // Save new user to the database
                 newUser.save(function(err) {
@@ -201,7 +201,7 @@ module.exports = function(app) {
         var errMsg;
 
         // http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
-        UserModel.getAuthenticated(req.body.username, req.body.password,
+        UserModel.getAuthenticated(req.body.displayName, req.body.password,
           function(err, user, reason) {
             if (err) {
               throw err;
@@ -309,9 +309,9 @@ module.exports = function(app) {
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
-                          id       : user._id,
-                          token    : token,
-                          username : user.displayName
+                          id          : user._id,
+                          token       : token,
+                          displayName : user.displayName
                         });
                       }
                     });
@@ -328,9 +328,9 @@ module.exports = function(app) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
                 res.status(200).send({
-                  id       : existingUser._id,
-                  token    : token,
-                  username : existingUser.displayName
+                  id          : existingUser._id,
+                  token       : token,
+                  displayName : existingUser.displayName
                 });
               } else {
                 console.log('3b new user');
@@ -348,9 +348,9 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
-                      id       : newUser._id,
-                      token    : token,
-                      username : newUser.displayName
+                      id          : newUser._id,
+                      token       : token,
+                      displayName : newUser.displayName
                     });
                   }
                 });
@@ -414,9 +414,9 @@ module.exports = function(app) {
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
-                          id       : user._id,
-                          token    : token,
-                          username : user.displayName
+                          id          : user._id,
+                          token       : token,
+                          displayName : user.displayName
                         });
                       }
                     });
@@ -433,9 +433,9 @@ module.exports = function(app) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
                 res.status(200).send({
-                  id       : existingUser._id,
-                  token    : token,
-                  username : existingUser.displayName
+                  id          : existingUser._id,
+                  token       : token,
+                  displayName : existingUser.displayName
                 });
               } else {
                 console.log('3b new user');
@@ -453,9 +453,9 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
-                      id       : newUser._id,
-                      token    : token,
-                      username : newUser.displayName
+                      id          : newUser._id,
+                      token       : token,
+                      displayName : newUser.displayName
                     });
                   }
                 });
@@ -520,9 +520,9 @@ module.exports = function(app) {
                     } else {
                       var token = createToken(undefined /* keepLoggedIn */, user);
                       res.status(200).send({
-                        id       : user._id,
-                        token    : token,
-                        username : user.displayName
+                        id          : user._id,
+                        token       : token,
+                        displayName : user.displayName
                       });
                     }
                   });
@@ -539,9 +539,9 @@ module.exports = function(app) {
                 // return res.send({ token: createToken(req, existingUser) });
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
                 res.status(200).send({
-                  id       : existingUser._id,
-                  token    : token,
-                  username : existingUser.displayName
+                  id          : existingUser._id,
+                  token       : token,
+                  displayName : existingUser.displayName
                 });
               } else {
                 console.log('3b new user');
@@ -559,9 +559,9 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
-                      id       : newUser._id,
-                      token    : token,
-                      username : newUser.displayName
+                      id          : newUser._id,
+                      token       : token,
+                      displayName : newUser.displayName
                     });
                   }
                 });
@@ -584,9 +584,9 @@ module.exports = function(app) {
       try {
         // req.user retrieved from ensureAuthenticated() middleware
         res.status(200).send({
-          id       : req.user._id,
-          username : req.user.local.username,
-          email    : req.user.local.email
+          id          : req.user._id,
+          displayName : req.user.local.displayName,
+          email       : req.user.local.email
         });
       } catch (ex) {
         console.log(ex);
