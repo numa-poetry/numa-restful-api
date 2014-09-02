@@ -45,6 +45,17 @@ module.exports = function(app) {
     return jwt.encode(payload, auth.TOKEN_SECRET);
   }
 
+  /**
+   * Error middleware for internel server errors regarding MongoDB
+   */
+  app.use(function(err, message, req, res, next) {
+    console.log(err.stack);
+    res.status(500).send({
+      type    : 'internal_server_error',
+      message : message
+    });
+  });
+
   function ensureAuthenticated(req, res, next) {
     var errMsg;
 
@@ -61,11 +72,12 @@ module.exports = function(app) {
       // Verify user exists
       UserModel.findById(req.params.id, function(err, user) {
         if (err) {
-          console.log(err);
-          res.status(500).send({
-            type    : 'internal_server_error',
-            message : 'The user is not authorized to access this resource.'
-          });
+          // console.log(err);
+          // res.status(500).send({
+          //   type    : 'internal_server_error',
+          //   message : 'The user is not authorized to access this resource.'
+          // });
+          return next(err, 'The user is not authorized to access this resource.');
         } else if (!user) {
           errMsg = 'The user could not be found.';
           console.log(errMsg.red);
@@ -106,86 +118,81 @@ module.exports = function(app) {
    * Local signup
    */
   app.post('/api/v1/signup',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[POST] /api/v1/signup'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      try {
-        var errMsg;
+      var errMsg;
 
-        // Verify displayName isn't taken
-        UserModel.findOne({
-          'local.displayName' : req.body.displayName
-        }, function(err, user) {
-          if (err) {
-            console.log(err);
-            res.status(500).send({
-              type    : 'internal_server_error',
-              message : 'The user could not be signed up'
-            });
-          } else if (user) {
-            errMsg = 'This username is already taken.';
-            console.log(errMsg.red);
-            res.status(400).send({
-              type    : 'bad_request',
-              message : errMsg
-            });
-          } else {
+      // Verify displayName isn't taken
+      UserModel.findOne({
+        'local.displayName' : req.body.displayName
+      }, function(err, user) {
+        if (err) {
+          // console.log(err);
+          // res.status(500).send({
+          //   type    : 'internal_server_error',
+          //   message : 'The user could not be signed up'
+          // });
+          return next(err, 'The user could not be signed up.');
+        } else if (user) {
+          errMsg = 'This username is already taken.';
+          console.log(errMsg.red);
+          res.status(400).send({
+            type    : 'bad_request',
+            message : errMsg
+          });
+        } else {
 
-            // Verify email isn't taken
-            UserModel.findOne({
-              'local.email' : req.body.email
-            }, function(err, user) {
-              if (err) {
-                console.log(err);
-                res.status(500).send({
-                  type    : 'internal_server_error',
-                  message : 'The user could not be signed up'
-                });
-              } else if (user) {
-                errMsg = 'This email is already taken.';
-                console.log(errMsg.red);
-                res.status(400).send({
-                  type    : 'bad_request',
-                  message : errMsg
-                });
-              } else {
+          // Verify email isn't taken
+          UserModel.findOne({
+            'local.email' : req.body.email
+          }, function(err, user) {
+            if (err) {
+              // console.log(err);
+              // res.status(500).send({
+              //   type    : 'internal_server_error',
+              //   message : 'The user could not be signed up'
+              // });
+              return next(err, 'The user could not be signed up.');
+            } else if (user) {
+              errMsg = 'This email is already taken.';
+              console.log(errMsg.red);
+              res.status(400).send({
+                type    : 'bad_request',
+                message : errMsg
+              });
+            } else {
 
-                // Build new user
-                var newUser               = new UserModel();
-                newUser.local.displayName = req.body.displayName;
-                newUser.local.email       = req.body.email;
-                newUser.local.password    = newUser.generateHash(req.body.password);
+              // Build new user
+              var newUser               = new UserModel();
+              newUser.local.displayName = req.body.displayName;
+              newUser.local.email       = req.body.email;
+              newUser.local.password    = newUser.generateHash(req.body.password);
 
-                // Save new user to the database
-                newUser.save(function(err) {
-                  if (err) {
-                    console.log(err);
-                    res.status(500).send({
-                      type    : 'internal_server_error',
-                      message : err
-                    });
-                  } else {
-                    newUser = newUser.toObject();
-                    delete newUser.local.password;
-                    var token = createToken(req.body.keepLoggedIn, newUser);
-                    res.status(201).send({
-                      id    : newUser._id,
-                      token : token
-                    });
-                  }
-                });
-              }
-            });
-          }
-        });
-      } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be signed up in.'
-        });
-      }
+              // Save new user to the database
+              newUser.save(function(err) {
+                if (err) {
+                  // console.log(err);
+                  // res.status(500).send({
+                  //   type    : 'internal_server_error',
+                  //   message : err
+                  // });
+                  return next(err, 'The user could not be saved to the database.');
+                } else {
+                  newUser = newUser.toObject();
+                  delete newUser.local.password;
+                  var token = createToken(req.body.keepLoggedIn, newUser);
+                  res.status(201).send({
+                    id    : newUser._id,
+                    token : token
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
     }
   );
 
@@ -193,67 +200,59 @@ module.exports = function(app) {
    * Local login
    */
   app.post('/api/v1/login',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[POST] /api/v1/login'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      try {
-        var errMsg;
+      var errMsg;
 
-        // http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
-        UserModel.getAuthenticated(req.body.displayName, req.body.password,
-          function(err, user, reason) {
-            if (err) {
-              throw err;
-            } else if (user) {
-              console.log('login successful'.green);
-              user = user.toObject();
-              delete user.password;
-              var token = createToken(req.body.keepLoggedIn, user);
-              res.status(201).send({
-                id    : user._id,
-                token : token
-              });
-            } else {
+      // http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
+      UserModel.getAuthenticated(req.body.displayName, req.body.password,
+        function(err, user, reason) {
+          if (err) {
+            return next(err, 'The user could not be logged in.');
+          } else if (user) {
+            console.log('login successful'.green);
+            user = user.toObject();
+            delete user.password;
+            var token = createToken(req.body.keepLoggedIn, user);
+            res.status(201).send({
+              id    : user._id,
+              token : token
+            });
+          } else {
 
-              // otherwise we can determine why we failed
-              var reasons = UserModel.failedLogin;
-              switch (reason) {
-                case reasons.NOT_FOUND:
-                  errMsg = 'The user could not be found.';
-                  console.log(errMsg.red);
-                  res.status(404).send({
-                    type    : 'not_found',
-                    message : errMsg
-                  });
-                  break;
-                case reasons.PASSWORD_INCORRECT:
-                  errMsg = 'Wrong username and/or password.';
-                  console.log(errMsg.red);
-                  res.status(400).send({
-                    type    : 'bad_request',
-                    message : errMsg
-                  });
-                  break;
-                case reasons.MAX_ATTEMPTS:
-                  errMsg = 'Maximum failed login attempts reached. Please try again later.';
-                  console.log(errMsg.red);
-                  res.status(403).send({
-                    type    : 'forbidden',
-                    message : errMsg
-                  });
-                  break;
-              }
+            // otherwise we can determine why we failed
+            var reasons = UserModel.failedLogin;
+            switch (reason) {
+              case reasons.NOT_FOUND:
+                errMsg = 'The user does not exist.';
+                console.log(errMsg.red);
+                res.status(404).send({
+                  type    : 'not_found',
+                  message : errMsg
+                });
+                break;
+              case reasons.PASSWORD_INCORRECT:
+                errMsg = 'Wrong username and/or password.';
+                console.log(errMsg.red);
+                res.status(400).send({
+                  type    : 'bad_request',
+                  message : errMsg
+                });
+                break;
+              case reasons.MAX_ATTEMPTS:
+                errMsg = 'Maximum failed login attempts reached. Please try again later.';
+                console.log(errMsg.red);
+                res.status(403).send({
+                  type    : 'forbidden',
+                  message : errMsg
+                });
+                break;
             }
           }
-        );
-      } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be logged in.'
-        });
-      }
+        }
+      );
     }
   );
 
@@ -261,7 +260,7 @@ module.exports = function(app) {
    * Login with Facebook
    */
   app.post('/auth/facebook',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[POST] /auth/facebook'.bold.green);
       console.log('Request body:'.green, req.body);
 
@@ -301,11 +300,12 @@ module.exports = function(app) {
 
                     user.save(function(err) {
                       if (err) {
-                        console.log(err);
-                        res.status(500).send({
-                          type    : 'internal_server_error',
-                          message : err
-                        });
+                        // console.log(err);
+                        // res.status(500).send({
+                        //   type    : 'internal_server_error',
+                        //   message : err
+                        // });
+                        return next(err, 'The user could not be saved to the database.');
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
@@ -340,11 +340,12 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    console.log(err);
-                    res.status(500).send({
-                      type    : 'internal_server_error',
-                      message : err
-                    });
+                    // console.log(err);
+                    // res.status(500).send({
+                    //   type    : 'internal_server_error',
+                    //   message : err
+                    // });
+                    return next(err, 'The user could not be saved to the database.');
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
@@ -365,7 +366,7 @@ module.exports = function(app) {
    * Login with Github
    */
   app.post('/auth/github',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[POST] /auth/github'.bold.green);
       console.log('Request body:'.green, req.body);
 
@@ -406,11 +407,12 @@ module.exports = function(app) {
 
                     user.save(function(err) {
                       if (err) {
-                        console.log(err);
-                        res.status(500).send({
-                          type    : 'internal_server_error',
-                          message : err
-                        });
+                        // console.log(err);
+                        // res.status(500).send({
+                        //   type    : 'internal_server_error',
+                        //   message : err
+                        // });
+                        return next(err, 'The user could not be saved to the database.');
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
@@ -445,11 +447,12 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    console.log(err);
-                    res.status(500).send({
-                      type    : 'internal_server_error',
-                      message : err
-                    });
+                    // console.log(err);
+                    // res.status(500).send({
+                    //   type    : 'internal_server_error',
+                    //   message : err
+                    // });
+                    return next(err, 'The user could not be saved to the database.');
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
@@ -470,7 +473,7 @@ module.exports = function(app) {
    * Login with Google
    */
   app.post('/auth/google',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[POST] /auth/google'.bold.green);
       console.log('Request body:'.green, req.body);
 
@@ -512,11 +515,12 @@ module.exports = function(app) {
 
                   user.save(function(err) {
                     if (err) {
-                      console.log(err);
-                      res.status(500).send({
-                        type    : 'internal_server_error',
-                        message : err
-                      });
+                      // console.log(err);
+                      // res.status(500).send({
+                      //   type    : 'internal_server_error',
+                      //   message : err
+                      // });
+                      return next(err, 'The user could not be saved to the database.');
                     } else {
                       var token = createToken(undefined /* keepLoggedIn */, user);
                       res.status(200).send({
@@ -551,11 +555,12 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    console.log(err);
-                    res.status(500).send({
-                      type    : 'internal_server_error',
-                      message : err
-                    });
+                    // console.log(err);
+                    // res.status(500).send({
+                    //   type    : 'internal_server_error',
+                    //   message : err
+                    // });
+                    return next(err, 'The user could not be saved to the database.');
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
@@ -577,24 +582,16 @@ module.exports = function(app) {
    */
   app.get('/api/v1/user/:id',
     ensureAuthenticated,
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      try {
-        // req.user retrieved from ensureAuthenticated() middleware
-        res.status(200).send({
-          id          : req.user._id,
-          displayName : req.user.local.displayName,
-          email       : req.user.local.email
-        });
-      } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be retrieved.'
-        });
-      }
+      // req.user retrieved from ensureAuthenticated() middleware
+      res.status(200).send({
+        id          : req.user._id,
+        displayName : req.user.local.displayName,
+        email       : req.user.local.email
+      });
     }
   );
 
@@ -603,43 +600,36 @@ module.exports = function(app) {
    */
   app.delete('/api/v1/user/:id/',
     ensureAuthenticated,
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[DELETE] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      try {
-        var errMsg, sucMsg;
+      var errMsg, sucMsg;
 
-        UserModel.findByIdAndRemove(req.user._id, function(err, user) {
-          if (err) {
-            console.log(err);
-            res.status(500).send({
-              type    : 'internal_server_error',
-              message : 'The user could not be deleted'
-            });
-          } else if (!user) {
-            errMsg = 'The user could not be found.';
-            console.log(errMsg.red);
-            res.status(404).send({
-              type    : 'not_found',
-              message : errMsg
-            });
-          } else {
-            sucMsg = 'The user was deleted.';
-            console.log(sucMsg.blue);
-            res.status(200).send({
-              type    : 'success',
-              message : sucMsg
-            });
-          }
-        });
-      } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'The user could not be deleted'
-        });
-      }
+      UserModel.findByIdAndRemove(req.user._id, function(err, user) {
+        if (err) {
+          // console.log(err);
+          // res.status(500).send({
+          //   type    : 'internal_server_error',
+          //   message : 'The user could not be deleted'
+          // });
+          return next(err, 'The user could not be deleted.');
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          sucMsg = 'The user was deleted.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
     }
   );
 
@@ -647,38 +637,31 @@ module.exports = function(app) {
    * Get all users
    */
   app.get('/api/v1/user',
-    function(req, res) {
+    function(req, res, next) {
       console.log('\n[GET] /api/v1/user'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      try {
-        var errMsg;
+      var errMsg;
 
-        UserModel.find(function(err, users) {
-          if (err) {
-            console.log(err);
-            res.status(500).send({
-              type    : 'internal_server_error',
-              message : 'All users could not be retrieved.'
-            });
-          }
-          if (!users) {
-            errMsg = 'All users could not be found';
-            console.log(errMsg.red);
-            res.status(404).send({
-              type    : 'not_found',
-              message : errMsg
-            });
-          }
-          res.status(200).send(users);
-        });
-      } catch (ex) {
-        console.log(ex);
-        res.status(500).send({
-          type    : 'internal_server_error',
-          message : 'All users could not be retrieved.'
-        });
-      }
+      UserModel.find(function(err, users) {
+        if (err) {
+          // console.log(err);
+          // res.status(500).send({
+          //   type    : 'internal_server_error',
+          //   message : 'All users could not be retrieved.'
+          // });
+          return next(err, 'Could not retrieve all users.');
+        }
+        if (!users) {
+          errMsg = 'All users could not be found';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        }
+        res.status(200).send(users);
+      });
     }
   );
 
