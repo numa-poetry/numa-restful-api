@@ -1,14 +1,17 @@
 'use strict';
 
 // modules ---------------------------------------------------------------------
-var crypto    = require('crypto');
-var colors    = require('colors');
-var moment    = require('moment');
-var jwt       = require('jwt-simple');
-var request   = require('request');
-var qs        = require('querystring');
-var UserModel = require('./models/user.js');
-var auth      = require('./config/auth');
+var crypto        = require('crypto');
+var colors        = require('colors');
+var moment        = require('moment');
+var jwt           = require('jwt-simple');
+var request       = require('request');
+var qs            = require('querystring');
+var async         = require('async');
+var nodemailer    = require('nodemailer');
+var smtpTransport = require('nodemailer-smtp-transport');
+var UserModel     = require('./models/user.js');
+var auth          = require('./config/auth');
 
 // routes ----------------------------------------------------------------------
 module.exports = function(app) {
@@ -44,17 +47,6 @@ module.exports = function(app) {
     };
     return jwt.encode(payload, auth.TOKEN_SECRET);
   }
-
-  /**
-   * Error middleware for internel server errors regarding MongoDB
-   */
-  app.use(function(err, message, req, res, next) {
-    console.log(err.stack);
-    res.status(500).send({
-      type    : 'internal_server_error',
-      message : message
-    });
-  });
 
   function ensureAuthenticated(req, res, next) {
     var errMsg;
@@ -173,11 +165,11 @@ module.exports = function(app) {
               // Save new user to the database
               newUser.save(function(err) {
                 if (err) {
-                  // console.log(err);
-                  // res.status(500).send({
-                  //   type    : 'internal_server_error',
-                  //   message : err
-                  // });
+                  console.log(err);
+                  res.status(500).send({
+                    type    : 'internal_server_error',
+                    message : err
+                  });
                   return next(err, 'The user could not be saved to the database.');
                 } else {
                   newUser = newUser.toObject();
@@ -255,6 +247,206 @@ module.exports = function(app) {
       );
     }
   );
+
+  /**
+   * Forgot password
+   */
+  app.post('/api/v1/forgot',
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/forgot'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+
+      async.waterfall([
+        function(done) {
+          crypto.randomBytes(20, function(err, buf) {
+            var token = buf.toString('hex');
+            done(err, token);
+          });
+        },
+        function(token, done) {
+          // Users with linked accounts will not have local credentials so catch
+          // requests with no email specified in the body
+          if (!req.body.email) {
+            errMsg = 'No account with that email address exists.';
+            console.log(errMsg.red);
+            res.status(404).send({
+              type    : 'not_found',
+              message : errMsg
+            });
+          } else {
+            UserModel.findOne({ 'local.email': req.body.email }, function(err, user) {
+              if (!user) {
+                errMsg = 'No account with that email address exists.';
+                console.log(errMsg.red);
+                res.status(404).send({
+                  type    : 'not_found',
+                  message : errMsg
+                });
+              } else {
+                user.resetPasswordToken   = token;
+                user.resetPasswordExpires = moment().add(1, 'hour').valueOf();
+                user.save(function(err) {
+                  done(err, token, user);
+                });
+              }
+            });
+          }
+        },
+        function(token, user, done) {
+          var transport = nodemailer.createTransport(smtpTransport({
+            service : 'Mailgun',
+            auth : {
+              user : 'postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org',
+              pass : 'Ln9v7MJr7G'
+            }
+          }));
+          var clientHost = 'localhost:9000';
+          var redirectLink = 'http://' + clientHost + '/#/reset?token=' + token;
+          console.log(redirectLink);
+          var mailOptions = {
+            to      : user.local.email,
+            from    : 'Mailgun Sandbox <postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org>',
+            subject : 'Password Reset',
+            text    : 'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
+              'Please click on the following link, or paste this into your browser to complete the process:\n\n' + redirectLink + '\n\n' +
+              'If you did not request this, please ignore this email and your password will remain unchanged.\n'
+          };
+          transport.sendMail(mailOptions, function(err) {
+            if (err) {
+              res.message = 'Could not send email to reset password.';
+              return next(err);
+            } else {
+              done(err, user);
+            }
+          });
+        }
+      ], function(err, user) {
+        if (err) {
+          return next(err, 'Could not send email to reset password.');
+        } else {
+          var sucMsg = 'An email has been sent to ' + user.local.email + ' with further instructions.';
+          console.log(sucMsg.green);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
+    });
+
+  app.get('/api/v1/reset/:token',
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/reset/:token'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      UserModel.findOne({
+        resetPasswordToken   : req.params.token,
+        resetPasswordExpires : {
+          $gt : moment().valueOf()
+        }
+      }, function(err, user) {
+        if (err) {
+          res.message = 'The user could not be verified.';
+          return next(err);
+        } else if (!user) {
+          var errMsg = 'No account with that email address exists.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          var sucMsg = 'The user exists.';
+          console.log(sucMsg.green);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
+    });
+
+  app.post('/api/v1/reset/:token',
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/reset/:token'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      async.waterfall([
+        function(done) {
+          UserModel.findOne({
+            resetPasswordToken   : req.params.token,
+            resetPasswordExpires : {
+              $gt : moment().valueOf()
+            }
+          }, function(err, user) {
+            if (err) {
+              res.message = 'The user could not be verified.';
+              return next(err);
+            } else if (!user) {
+              var errMsg = 'The user account doesn\'t exist.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              user.local.password       = user.generateHash(req.body.password);
+              user.resetPasswordToken   = undefined;
+              user.resetPasswordExpires = undefined;
+
+              user.save(function(err) {
+                if (err) {
+                  res.message = 'The user\'s password could not be updated.';
+                  return next(err);
+                } else {
+                  var sucMsg = 'The user\'s password has been updated successfully.';
+                  console.log(sucMsg.green);
+                  done(err, user);
+                }
+              });
+            }
+          });
+        },
+        function(user, done) {
+          var transport = nodemailer.createTransport(smtpTransport({
+            service : 'Mailgun',
+            auth : {
+              user : 'postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org',
+              pass : 'Ln9v7MJr7G'
+            }
+          }));
+          var mailOptions = {
+            to      : user.local.email,
+            from    : 'Mailgun Sandbox <postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org>',
+            subject : 'Your password has been changed',
+            text    : 'Hello,\n\n' +
+              'This is a confirmation that the password for your account has just been changed.\n'
+          };
+          transport.sendMail(mailOptions, function(err) {
+            if (err) {
+              res.message = 'Could not send changed password confirmation email.';
+              return next(err);
+            } else {
+              done(err, user);
+            }
+          });
+        }
+      ],
+      function(err, user) {
+        if (err) {
+          return next(err, 'Could not send changed password confirmation email.');
+        } else {
+          var sucMsg = 'A changed password confirmation email has been sent to ' + user.local.email;
+          console.log(sucMsg.green);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
+    });
 
   /**
    * Login with Facebook

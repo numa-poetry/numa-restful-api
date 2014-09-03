@@ -15,6 +15,9 @@ try {
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
 
+// db config -------------------------------------------------------------------
+  mongoose.connect(db.MONGO_CONNECTION_URI);
+
 // global config ---------------------------------------------------------------
   app.set('port', process.env.PORT || 3000);
   app.use(logger({
@@ -40,11 +43,17 @@ try {
     }));
   }
 
-// db config -------------------------------------------------------------------
-  mongoose.connect(db.MONGO_CONNECTION_URI);
-
 // routes ----------------------------------------------------------------------
   require('./routes.js')(app);
+
+// middleware ------------------------------------------------------------------
+  app.use(function(err, req, res, next) {
+    console.log(err.stack);
+    res.status(500).send({
+      type    : 'internal_server_error',
+      message : res.message
+    });
+  });
 
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {

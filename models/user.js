@@ -24,7 +24,10 @@ var UserSchema = new Schema({
   },
 
   loginAttempts: { type: Number, required: true, default: 0 },
-  lockUntil: { type: Number }
+  lockUntil: { type: Number },
+
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date }
 
 });
 
@@ -49,6 +52,27 @@ UserSchema.methods.comparePassword = function(candidatePassword, cb) {
 UserSchema.methods.generateHash = function(password) {
   return bcrypt.hashSync(password, bcrypt.genSaltSync(SALT_WORK_FACTOR), null);
 };
+
+// UserSchema.pre('save', function(next) {
+//   var user = this;
+
+//   // only hash the password if it has been modified (or is new)
+//   if (!user.isModified('local.password')) return next();
+
+//   // generate a salt
+//   bcrypt.genSalt(SALT_WORK_FACTOR, function(err, salt) {
+//     if (err) return next(err);
+
+//     // hash the password using our new salt
+//     bcrypt.hash(user.local.password, salt, null, function(err, hash) {
+//       if (err) return next(err);
+
+//       // override the cleartext password with the hashed one
+//       user.local.password = hash;
+//       next();
+//     });
+//   });
+// });
 
 UserSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.local.password);
@@ -93,7 +117,6 @@ var reasons = UserSchema.statics.failedLogin = {
 };
 
 UserSchema.statics.getAuthenticated = function(displayName, password, cb) {
-
 
   this.findOne({
     'local.displayName': displayName
