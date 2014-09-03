@@ -15,8 +15,15 @@ try {
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
 
+  var message;
+
 // db config -------------------------------------------------------------------
   mongoose.connect(db.MONGO_CONNECTION_URI);
+
+  mongoose.connection.on('error', function() {
+    message = '✗ MongoDB Connection Error. Please make sure MongoDB is running.';
+    console.error(message.red);
+  });
 
 // global config ---------------------------------------------------------------
   app.set('port', process.env.PORT || 3000);
@@ -57,7 +64,7 @@ try {
 
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {
-    var message = '\nExpress server listening on port ' + app.get('port');
+    message = '\nExpress server listening on port ' + app.get('port');
     console.log(message.bold.blue);
   });
 }
