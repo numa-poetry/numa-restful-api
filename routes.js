@@ -64,12 +64,8 @@ module.exports = function(app) {
       // Verify user exists
       UserModel.findById(req.params.id, function(err, user) {
         if (err) {
-          // console.log(err);
-          // res.status(500).send({
-          //   type    : 'internal_server_error',
-          //   message : 'The user is not authorized to access this resource.'
-          // });
-          return next(err, 'The user is not authorized to access this resource.');
+          res.message = 'The user is not authorized to access this resource.';
+          return next(err);
         } else if (!user) {
           errMsg = 'The user could not be found.';
           console.log(errMsg.red);
@@ -78,33 +74,48 @@ module.exports = function(app) {
             message : errMsg
           });
         } else {
-
           var token   = req.headers.authorization.split(' ')[1];
-          var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-          // Verify user is token subject
-          if (payload.sub !== req.params.id) {
-            errMsg = 'The user is not the token subject.';
+          try {
+            var payload = jwt.decode(token, auth.TOKEN_SECRET);
+
+            // Verify user is token subject
+            if (payload.sub !== req.params.id) {
+              errMsg = 'The user is not the token subject.';
+              console.log(errMsg.red);
+              res.status(401).send({
+                type    : 'unauthorized',
+                message : errMsg
+              });
+            } else if (payload.exp <= Date.now()) {
+              errMsg = 'The user\'s session token has expired.';
+              console.log(errMsg.red);
+              res.status(498).send({
+                type    : 'token_expired',
+                message : errMsg
+              });
+            } else {
+              req.user = user;
+              next();
+            }
+          } catch(ex) {
+            errMsg = 'Invalid token. Token has been tampered with.';
             console.log(errMsg.red);
             res.status(401).send({
-              type    : 'unauthorized',
+              type    : 'bad_request',
               message : errMsg
             });
-          } else if (payload.exp <= Date.now()) {
-            errMsg = 'The user\'s session token has expired.';
-            console.log(errMsg.red);
-            res.status(498).send({
-              type    : 'token_expired',
-              message : errMsg
-            });
-          } else {
-            req.user = user;
-            next();
           }
         }
       });
     }
   }
+
+  app.get('/', function(req, res) {
+    res.status(200).send({
+      message : 'Hey!'
+    });
+  });
 
   /**
    * Local signup
@@ -126,7 +137,8 @@ module.exports = function(app) {
           //   type    : 'internal_server_error',
           //   message : 'The user could not be signed up'
           // });
-          return next(err, 'The user could not be signed up.');
+          res.message = 'The user could not be signed up.';
+          return next(err);
         } else if (user) {
           errMsg = 'This username is already taken.';
           console.log(errMsg.red);
@@ -141,12 +153,8 @@ module.exports = function(app) {
             'local.email' : req.body.email
           }, function(err, user) {
             if (err) {
-              // console.log(err);
-              // res.status(500).send({
-              //   type    : 'internal_server_error',
-              //   message : 'The user could not be signed up'
-              // });
-              return next(err, 'The user could not be signed up.');
+              res.message = 'The user could not be signed up.';
+              return next(err);
             } else if (user) {
               errMsg = 'This email is already taken.';
               console.log(errMsg.red);
@@ -492,12 +500,8 @@ module.exports = function(app) {
 
                     user.save(function(err) {
                       if (err) {
-                        // console.log(err);
-                        // res.status(500).send({
-                        //   type    : 'internal_server_error',
-                        //   message : err
-                        // });
-                        return next(err, 'The user could not be saved to the database.');
+                        res.message = 'The user could not be saved to the database.';
+                        return next(err);
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
@@ -532,12 +536,8 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    // console.log(err);
-                    // res.status(500).send({
-                    //   type    : 'internal_server_error',
-                    //   message : err
-                    // });
-                    return next(err, 'The user could not be saved to the database.');
+                    res.message = 'The user could not be saved to the database.';
+                    return next(err);
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
@@ -599,12 +599,8 @@ module.exports = function(app) {
 
                     user.save(function(err) {
                       if (err) {
-                        // console.log(err);
-                        // res.status(500).send({
-                        //   type    : 'internal_server_error',
-                        //   message : err
-                        // });
-                        return next(err, 'The user could not be saved to the database.');
+                        res.message = 'The user could not be saved to the database.';
+                        return next(err);
                       } else {
                         var token = createToken(undefined /* keepLoggedIn */, user);
                         res.status(200).send({
@@ -639,12 +635,8 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    // console.log(err);
-                    // res.status(500).send({
-                    //   type    : 'internal_server_error',
-                    //   message : err
-                    // });
-                    return next(err, 'The user could not be saved to the database.');
+                    res.message = 'The user could not be saved to the database.';
+                    return next(err);
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
@@ -707,12 +699,8 @@ module.exports = function(app) {
 
                   user.save(function(err) {
                     if (err) {
-                      // console.log(err);
-                      // res.status(500).send({
-                      //   type    : 'internal_server_error',
-                      //   message : err
-                      // });
-                      return next(err, 'The user could not be saved to the database.');
+                      res.message = 'The user could not be saved to the database.';
+                      return next(err);
                     } else {
                       var token = createToken(undefined /* keepLoggedIn */, user);
                       res.status(200).send({
@@ -732,7 +720,6 @@ module.exports = function(app) {
             UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existingUser');
-                // return res.send({ token: createToken(req, existingUser) });
                 var token = createToken(undefined /* keepLoggedIn */, existingUser);
                 res.status(200).send({
                   id          : existingUser._id,
@@ -747,12 +734,8 @@ module.exports = function(app) {
 
                 newUser.save(function(err) {
                   if (err) {
-                    // console.log(err);
-                    // res.status(500).send({
-                    //   type    : 'internal_server_error',
-                    //   message : err
-                    // });
-                    return next(err, 'The user could not be saved to the database.');
+                    res.message = 'The user could not be saved to the database.';
+                    return next(err);
                   } else {
                     var token = createToken(undefined /* keepLoggedIn */, newUser);
                     res.status(201).send({
