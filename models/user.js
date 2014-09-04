@@ -16,7 +16,7 @@ var UserSchema = new Schema({
   facebook: { type: String },
 
   displayName: { type: String },
-  email: { type: String, unique: true, trim: true },
+  email: { type: String, trim: true },
   password: { type: String },
 
   local: {
@@ -41,7 +41,7 @@ UserSchema.plugin(timestamps);
 
 // methods ---------------------------------------------------------------------
 UserSchema.methods.comparePassword = function(candidatePassword, cb) {
-  bcrypt.compare(candidatePassword, this.local.password, function(err, isMatch) {
+  bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
     if (err) {
       return cb(err);
     }
@@ -75,7 +75,7 @@ UserSchema.methods.generateHash = function(password) {
 // });
 
 UserSchema.methods.validPassword = function(password) {
-  return bcrypt.compareSync(password, this.local.password);
+  return bcrypt.compareSync(password, this.password);
 };
 
 UserSchema.methods.incLoginAttempts = function(cb) {
