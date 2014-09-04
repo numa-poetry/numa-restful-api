@@ -20,6 +20,7 @@ module.exports = {
 
   'TOKEN_SECRET'    : 'pltcM9z$SP1&*aoaadE9',
   'ENCRYPTION_KEY'  : 'lW0!KAZGy!jU59&#5&Hr',
-  'ENCRYPTION_ALGO' : 'aes128'
+  'ENCRYPTION_ALGO' : 'aes128',
+  'HASHIDS_SALT'    : 'mHDg*ZiQ*k20*26F^Tw0'
 
 };

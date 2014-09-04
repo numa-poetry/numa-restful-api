@@ -10,9 +10,12 @@ var qs            = require('querystring');
 var async         = require('async');
 var nodemailer    = require('nodemailer');
 var smtpTransport = require('nodemailer-smtp-transport');
-var hashids       = require('hashids');
+var Hashids       = require('hashids');
 var UserModel     = require('./models/user.js');
 var auth          = require('./config/auth');
+
+// Pass unique salt value
+var hashids = new Hashids(auth.HASHIDS_SALT);
 
 // routes ----------------------------------------------------------------------
 module.exports = function(app) {
@@ -41,7 +44,8 @@ module.exports = function(app) {
     }
     payload = {
       user  : user,
-      'sub' : user._id,           // subject (identifies the principal that is the subject of the JWT)
+      // 'sub' : user._id,           // subject (identifies the principal that is the subject of the JWT)
+      'sub' : hashids.encryptHex(user._id),
       // 'iss' : req.hostname,       // issuer (specifies entity making the request)
       'iat' : moment().valueOf(), // The iat (issued at) claim identifies the time at which the JWT was issued.
       'exp' : expires             // expires (lifetime of token)
@@ -63,7 +67,7 @@ module.exports = function(app) {
     } else {
 
       // Verify user exists
-      UserModel.findById(req.params.id, function(err, user) {
+      UserModel.findById(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user is not authorized to access this resource.';
           return next(err);
@@ -158,7 +162,7 @@ module.exports = function(app) {
               delete newUser.password;
               var token = createToken(req.body.stayLoggedIn, newUser);
               res.status(201).send({
-                id    : newUser._id,
+                id    : hashids.encryptHex(newUser._id),
                 token : token
               });
             }
@@ -189,7 +193,7 @@ module.exports = function(app) {
             delete user.password;
             var token = createToken(req.body.stayLoggedIn, user);
             res.status(201).send({
-              id    : user._id,
+              id    : hashids.encryptHex(user._id),
               token : token
             });
           } else {
@@ -463,7 +467,7 @@ module.exports = function(app) {
                 var token   = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(payload.sub, function(err, user) {
+                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
@@ -477,7 +481,7 @@ module.exports = function(app) {
                       } else {
                         var token = createToken(undefined /* stayLoggedIn */, user);
                         res.status(200).send({
-                          id          : user._id,
+                          id          : hashids.encryptHex(user._id),
                           token       : token,
                           displayName : user.displayName
                         });
@@ -496,7 +500,7 @@ module.exports = function(app) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
-                  id          : existingUser._id,
+                  id          : hashids.encryptHex(existingUser._id),
                   token       : token,
                   displayName : existingUser.displayName
                 });
@@ -513,7 +517,7 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
-                      id          : newUser._id,
+                      id          : hashids.encryptHex(newUser._id),
                       token       : token,
                       displayName : newUser.displayName
                     });
@@ -562,7 +566,7 @@ module.exports = function(app) {
                 var token   = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(payload.sub, function(err, user) {
+                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
@@ -576,7 +580,7 @@ module.exports = function(app) {
                       } else {
                         var token = createToken(undefined /* stayLoggedIn */, user);
                         res.status(200).send({
-                          id          : user._id,
+                          id          : hashids.encryptHex(user._id),
                           token       : token,
                           displayName : user.displayName
                         });
@@ -595,7 +599,7 @@ module.exports = function(app) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
-                  id          : existingUser._id,
+                  id          : hashids.encryptHex(existingUser._id),
                   token       : token,
                   displayName : existingUser.displayName
                 });
@@ -612,7 +616,7 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
-                      id          : newUser._id,
+                      id          : hashids.encryptHex(newUser._id),
                       token       : token,
                       displayName : newUser.displayName
                     });
@@ -662,7 +666,7 @@ module.exports = function(app) {
                 var token = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(payload.sub, function(err, user) {
+                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   }
@@ -676,7 +680,7 @@ module.exports = function(app) {
                     } else {
                       var token = createToken(undefined /* stayLoggedIn */, user);
                       res.status(200).send({
-                        id          : user._id,
+                        id          : hashids.encryptHex(user._id),
                         token       : token,
                         displayName : user.displayName
                       });
@@ -694,7 +698,7 @@ module.exports = function(app) {
                 console.log('3b existingUser');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
-                  id          : existingUser._id,
+                  id          : hashids.encryptHex(existingUser._id),
                   token       : token,
                   displayName : existingUser.displayName
                 });
@@ -711,7 +715,7 @@ module.exports = function(app) {
                   } else {
                     var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
-                      id          : newUser._id,
+                      id          : hashids.encryptHex(newUser._id),
                       token       : token,
                       displayName : newUser.displayName
                     });
@@ -735,7 +739,7 @@ module.exports = function(app) {
 
       // req.user retrieved from ensureAuthenticated() middleware
       res.status(200).send({
-        id          : req.user._id,
+        id          : hashids.encryptHex(req.user._id),
         displayName : req.user.local.displayName,
         email       : req.user.email
       });
@@ -753,7 +757,7 @@ module.exports = function(app) {
 
       var errMsg, sucMsg;
 
-      UserModel.findByIdAndRemove(req.user._id, function(err, user) {
+      UserModel.findByIdAndRemove(hashids.decryptHex(req.user._id), function(err, user) {
         if (err) {
           res.message = 'The user could not be deleted.';
           return next(err);
