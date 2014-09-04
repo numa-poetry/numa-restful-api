@@ -16,11 +16,11 @@ var UserSchema = new Schema({
   facebook: { type: String },
 
   displayName: { type: String },
+  email: { type: String, unique: true, trim: true },
+  password: { type: String },
 
   local: {
-    displayName: { type: String, unique: true, trim: true },
-    email: { type: String, unique: true, trim: true },
-    password: { type: String }
+    displayName: { type: String, unique: true, trim: true }
   },
 
   loginAttempts: { type: Number, required: true, default: 0 },
@@ -102,8 +102,8 @@ UserSchema.methods.incLoginAttempts = function(cb) {
 //   var user = this.toObject();
 //   delete user._id;
 //   delete user.__v;
-//   delete user.local.email;
-//   delete user.local.password;
+//   delete user.email;
+//   delete user.password;
 //   delete user.updatedAt;
 //   return user;
 // };

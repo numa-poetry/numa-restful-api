@@ -2,6 +2,6 @@
 
 module.exports = {
 
-  'MONGO_CONNECTION_URI' : 'mongodb://localhost/warrior-poets'
+  'MONGO_CONNECTION_URI' : 'mongodb://localhost/numa'
 
 };

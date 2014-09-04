@@ -10,6 +10,7 @@ var qs            = require('querystring');
 var async         = require('async');
 var nodemailer    = require('nodemailer');
 var smtpTransport = require('nodemailer-smtp-transport');
+var hashids       = require('hashids');
 var UserModel     = require('./models/user.js');
 var auth          = require('./config/auth');
 
@@ -28,11 +29,11 @@ module.exports = function(app) {
     return decryptedText;
   }
 
-  function createToken(keepLoggedIn, user) {
+  function createToken(stayLoggedIn, user) {
     var expires, payload;
 
-    if (keepLoggedIn) {
-      expires = moment().add(7, 'days').valueOf();
+    if (stayLoggedIn) {
+      expires = moment().add(14, 'days').valueOf();
       console.log('long session token set'.yellow);
     } else {
       expires = moment().add(1, 'hour').valueOf();
@@ -74,7 +75,7 @@ module.exports = function(app) {
             message : errMsg
           });
         } else {
-          var token   = req.headers.authorization.split(' ')[1];
+          var token = req.headers.authorization.split(' ')[1];
 
           try {
             var payload = jwt.decode(token, auth.TOKEN_SECRET);
@@ -111,12 +112,6 @@ module.exports = function(app) {
     }
   }
 
-  app.get('/', function(req, res) {
-    res.status(200).send({
-      message : 'Hey!'
-    });
-  });
-
   /**
    * Local signup
    */
@@ -132,11 +127,6 @@ module.exports = function(app) {
         'local.displayName' : req.body.displayName
       }, function(err, user) {
         if (err) {
-          // console.log(err);
-          // res.status(500).send({
-          //   type    : 'internal_server_error',
-          //   message : 'The user could not be signed up'
-          // });
           res.message = 'The user could not be signed up.';
           return next(err);
         } else if (user) {
@@ -148,46 +138,28 @@ module.exports = function(app) {
           });
         } else {
 
-          // Verify email isn't taken
-          UserModel.findOne({
-            'local.email' : req.body.email
-          }, function(err, user) {
+          // Build new user
+          var newUser               = new UserModel();
+          newUser.local.displayName = req.body.displayName;
+          newUser.email             = req.body.email;
+          newUser.password          = newUser.generateHash(req.body.password);
+
+          // Save new user to the database
+          newUser.save(function(err) {
             if (err) {
-              res.message = 'The user could not be signed up.';
-              return next(err);
-            } else if (user) {
-              errMsg = 'This email is already taken.';
-              console.log(errMsg.red);
-              res.status(400).send({
-                type    : 'bad_request',
-                message : errMsg
+              console.log(err);
+              res.status(500).send({
+                type    : 'internal_server_error',
+                message : err
               });
+              return next(err, 'The user could not be saved to the database.');
             } else {
-
-              // Build new user
-              var newUser               = new UserModel();
-              newUser.local.displayName = req.body.displayName;
-              newUser.local.email       = req.body.email;
-              newUser.local.password    = newUser.generateHash(req.body.password);
-
-              // Save new user to the database
-              newUser.save(function(err) {
-                if (err) {
-                  console.log(err);
-                  res.status(500).send({
-                    type    : 'internal_server_error',
-                    message : err
-                  });
-                  return next(err, 'The user could not be saved to the database.');
-                } else {
-                  newUser = newUser.toObject();
-                  delete newUser.local.password;
-                  var token = createToken(req.body.keepLoggedIn, newUser);
-                  res.status(201).send({
-                    id    : newUser._id,
-                    token : token
-                  });
-                }
+              newUser = newUser.toObject();
+              delete newUser.password;
+              var token = createToken(req.body.stayLoggedIn, newUser);
+              res.status(201).send({
+                id    : newUser._id,
+                token : token
               });
             }
           });
@@ -215,7 +187,7 @@ module.exports = function(app) {
             console.log('login successful'.green);
             user = user.toObject();
             delete user.password;
-            var token = createToken(req.body.keepLoggedIn, user);
+            var token = createToken(req.body.stayLoggedIn, user);
             res.status(201).send({
               id    : user._id,
               token : token
@@ -284,7 +256,7 @@ module.exports = function(app) {
               message : errMsg
             });
           } else {
-            UserModel.findOne({ 'local.email': req.body.email }, function(err, user) {
+            UserModel.findOne({ 'email': req.body.email }, function(err, user) {
               if (!user) {
                 errMsg = 'No account with that email address exists.';
                 console.log(errMsg.red);
@@ -314,7 +286,7 @@ module.exports = function(app) {
           var redirectLink = 'http://' + clientHost + '/#/reset?token=' + token;
           console.log(redirectLink);
           var mailOptions = {
-            to      : user.local.email,
+            to      : user.email,
             from    : 'Mailgun Sandbox <postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org>',
             subject : 'Password Reset',
             text    : 'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
@@ -334,7 +306,7 @@ module.exports = function(app) {
         if (err) {
           return next(err, 'Could not send email to reset password.');
         } else {
-          var sucMsg = 'An email has been sent to ' + user.local.email + ' with further instructions.';
+          var sucMsg = 'An email has been sent to ' + user.email + ' with further instructions.';
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -400,7 +372,7 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
-              user.local.password       = user.generateHash(req.body.password);
+              user.password             = user.generateHash(req.body.password);
               user.resetPasswordToken   = undefined;
               user.resetPasswordExpires = undefined;
 
@@ -426,7 +398,7 @@ module.exports = function(app) {
             }
           }));
           var mailOptions = {
-            to      : user.local.email,
+            to      : user.email,
             from    : 'Mailgun Sandbox <postmaster@sandbox017bdf6980a2439e84e9151f74a4a3f1.mailgun.org>',
             subject : 'Your password has been changed',
             text    : 'Hello,\n\n' +
@@ -446,7 +418,7 @@ module.exports = function(app) {
         if (err) {
           return next(err, 'Could not send changed password confirmation email.');
         } else {
-          var sucMsg = 'A changed password confirmation email has been sent to ' + user.local.email;
+          var sucMsg = 'A changed password confirmation email has been sent to ' + user.email;
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -503,7 +475,7 @@ module.exports = function(app) {
                         res.message = 'The user could not be saved to the database.';
                         return next(err);
                       } else {
-                        var token = createToken(undefined /* keepLoggedIn */, user);
+                        var token = createToken(undefined /* stayLoggedIn */, user);
                         res.status(200).send({
                           id          : user._id,
                           token       : token,
@@ -522,7 +494,7 @@ module.exports = function(app) {
             UserModel.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
-                var token = createToken(undefined /* keepLoggedIn */, existingUser);
+                var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
                   id          : existingUser._id,
                   token       : token,
@@ -539,7 +511,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* keepLoggedIn */, newUser);
+                    var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
                       id          : newUser._id,
                       token       : token,
@@ -602,7 +574,7 @@ module.exports = function(app) {
                         res.message = 'The user could not be saved to the database.';
                         return next(err);
                       } else {
-                        var token = createToken(undefined /* keepLoggedIn */, user);
+                        var token = createToken(undefined /* stayLoggedIn */, user);
                         res.status(200).send({
                           id          : user._id,
                           token       : token,
@@ -621,7 +593,7 @@ module.exports = function(app) {
             UserModel.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
-                var token = createToken(undefined /* keepLoggedIn */, existingUser);
+                var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
                   id          : existingUser._id,
                   token       : token,
@@ -638,7 +610,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* keepLoggedIn */, newUser);
+                    var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
                       id          : newUser._id,
                       token       : token,
@@ -702,7 +674,7 @@ module.exports = function(app) {
                       res.message = 'The user could not be saved to the database.';
                       return next(err);
                     } else {
-                      var token = createToken(undefined /* keepLoggedIn */, user);
+                      var token = createToken(undefined /* stayLoggedIn */, user);
                       res.status(200).send({
                         id          : user._id,
                         token       : token,
@@ -720,7 +692,7 @@ module.exports = function(app) {
             UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existingUser');
-                var token = createToken(undefined /* keepLoggedIn */, existingUser);
+                var token = createToken(undefined /* stayLoggedIn */, existingUser);
                 res.status(200).send({
                   id          : existingUser._id,
                   token       : token,
@@ -737,7 +709,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* keepLoggedIn */, newUser);
+                    var token = createToken(undefined /* stayLoggedIn */, newUser);
                     res.status(201).send({
                       id          : newUser._id,
                       token       : token,
@@ -765,7 +737,7 @@ module.exports = function(app) {
       res.status(200).send({
         id          : req.user._id,
         displayName : req.user.local.displayName,
-        email       : req.user.local.email
+        email       : req.user.email
       });
     }
   );
@@ -783,12 +755,8 @@ module.exports = function(app) {
 
       UserModel.findByIdAndRemove(req.user._id, function(err, user) {
         if (err) {
-          // console.log(err);
-          // res.status(500).send({
-          //   type    : 'internal_server_error',
-          //   message : 'The user could not be deleted'
-          // });
-          return next(err, 'The user could not be deleted.');
+          res.message = 'The user could not be deleted.';
+          return next(err);
         } else if (!user) {
           errMsg = 'The user could not be found.';
           console.log(errMsg.red);
@@ -820,12 +788,8 @@ module.exports = function(app) {
 
       UserModel.find(function(err, users) {
         if (err) {
-          // console.log(err);
-          // res.status(500).send({
-          //   type    : 'internal_server_error',
-          //   message : 'All users could not be retrieved.'
-          // });
-          return next(err, 'Could not retrieve all users.');
+          res.message = 'Could not retrieve all users.';
+          return next(err);
         }
         if (!users) {
           errMsg = 'All users could not be found';
