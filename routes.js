@@ -44,11 +44,10 @@ module.exports = function(app) {
     }
     payload = {
       user  : user,
-      // 'sub' : user._id,           // subject (identifies the principal that is the subject of the JWT)
-      'sub' : hashids.encryptHex(user._id),
-      // 'iss' : req.hostname,       // issuer (specifies entity making the request)
+      'sub' : hashids.encryptHex(user._id), // subject (identifies the principal that is the subject of the JWT)
+      // 'iss' : req.hostname, // issuer (specifies entity making the request)
       'iat' : moment().valueOf(), // The iat (issued at) claim identifies the time at which the JWT was issued.
-      'exp' : expires             // expires (lifetime of token)
+      'exp' : expires // expires (lifetime of token)
     };
     return jwt.encode(payload, auth.TOKEN_SECRET);
   }
@@ -749,7 +748,7 @@ module.exports = function(app) {
   /**
    * Delete a user
    */
-  app.delete('/api/v1/user/:id/',
+  app.delete('/api/v1/user/:id',
     ensureAuthenticated,
     function(req, res, next) {
       console.log('\n[DELETE] /api/v1/user/:id'.bold.green);
@@ -757,7 +756,7 @@ module.exports = function(app) {
 
       var errMsg, sucMsg;
 
-      UserModel.findByIdAndRemove(hashids.decryptHex(req.user._id), function(err, user) {
+      UserModel.findByIdAndRemove(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user could not be deleted.';
           return next(err);
