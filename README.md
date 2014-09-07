@@ -4,7 +4,7 @@
 * Download and install [Node.js](http://www.nodejs.org/download/). You can also follow [this gist](https://gist.github.com/isaacs/579814) for a quick and easy way to install Node.js and npm
 * Download and install [Node.js package manager](https://github.com/npm/npm).
 * Download and install [MongoDB](http://docs.mongodb.org/manual/installation/) - Make sure `mongod` is running on the default port (27017).
-* Download and install [nodemon](http://nodemon.io/): `npm install -g nodemon`
+* Install [nodemon](http://nodemon.io/): `npm install -g nodemon`
 * Clone the repo: `git clone https://github.com/trance-with-me/numa-restful-api.git`
 * Install packages: `npm install`
 * Launch server: `nodemon .\server.js`. 
