@@ -1,5 +1,7 @@
 'use strict';
 
+var message;
+
 try {
 
 // modules ---------------------------------------------------------------------
@@ -15,13 +17,11 @@ try {
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
 
-  var message;
-
 // db config -------------------------------------------------------------------
   mongoose.connect(db.MONGO_CONNECTION_URI);
 
   mongoose.connection.on('error', function() {
-    message = '✗ MongoDB Connection Error. Please make sure MongoDB is running.';
+    message = '✗ MongoDB Connection Error. Please make sure MongoDB is running and restart the server.';
     console.error(message.red);
   });
 
@@ -38,12 +38,17 @@ try {
   app.use(cors());
 
 // env config ------------------------------------------------------------------
-  if (process.env.NODE_ENV === 'development') {
+  if (app.get('env') === 'development') {
     app.use(errorhandler());
     // mongoose.set('debug', true);
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  // Force HTTPS
+  if (app.get('env') === 'production') {
+    app.use(function(req, res, next) {
+      var protocol = req.get('x-forwarded-proto');
+      protocol == 'https' ? next() : res.redirect('https://' + req.hostname + req.url);
+    });
     app.use(errorhandler({
       dumpExceptions : true,
       showStack      : true

@@ -740,7 +740,56 @@ module.exports = function(app) {
       res.status(200).send({
         id          : hashids.encryptHex(req.user._id),
         displayName : req.user.local.displayName,
-        email       : req.user.email
+        email       : req.user.email,
+        joinedDate  : req.user.createdAt
+      });
+
+    }
+  );
+
+  /**
+   * Update a user
+   */
+  app.put('/api/v1/user/:id',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[PUT] /api/v1/user/:id'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      // req.user retrieved from ensureAuthenticated() middleware
+      // res.status(200).send({ message : 'TEST' });
+      UserModel.findById(req.user._id, function(err, user) {
+        if (err) {
+          res.message = 'The user could not be found.';
+          return next(err);
+        } else if (!user) {
+          var errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          user.email = req.body.email || user.email;
+          user.save(function(err) {
+            if (err) {
+              res.message = 'The user could not be saved to the database.';
+              return next(err);
+            } else {
+              var sucMsg = 'The user was updated.';
+              var resObj = {};
+              resObj.user = user;
+              resObj.type = 'success';
+              resObj.message = sucMsg;
+              console.log(sucMsg.blue);
+              res.status(200).send(
+                // type    : 'success',
+                // message : sucMsg
+                resObj
+              );
+            }
+          });
+        }
       });
     }
   );
