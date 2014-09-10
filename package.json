@@ -19,6 +19,10 @@
     "nodemailer": "~1.2.1",
     "async": "~0.9.0",
     "nodemailer-smtp-transport": "~0.1.12",
-    "hashids": "~0.3.3"
+    "hashids": "~0.3.3",
+    "multiparty": "~3.3.2",
+    "uuid": "~1.4.1",
+    "s3": "~4.1.1",
+    "aws-sdk": "~2.0.15"
   }
 }

@@ -11,11 +11,29 @@ var async         = require('async');
 var nodemailer    = require('nodemailer');
 var smtpTransport = require('nodemailer-smtp-transport');
 var Hashids       = require('hashids');
+var multiparty    = require('multiparty');
+var uuid          = require('uuid');
+var s3            = require('s3');
+var AWS           = require('aws-sdk');
 var UserModel     = require('./models/user.js');
 var auth          = require('./config/auth');
 
 // Pass unique salt value
 var hashids = new Hashids(auth.HASHIDS_SALT);
+
+var s3Client = s3.createClient({
+  s3Options: {
+    accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
+    secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
+  }
+});
+
+AWS.config.update({
+  accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
+  secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
+});
+
+// var s3 = new AWS.S3();
 
 // routes ----------------------------------------------------------------------
 module.exports = function(app) {
@@ -856,4 +874,177 @@ module.exports = function(app) {
     }
   );
 
+  /**
+   * Pull down profile image from temporary S3 bucket, process, and then upload
+   * to permanent S3 bucket
+   * http://www.cheynewallace.com/uploading-to-s3-with-angularjs/
+   */
+  app.post('/api/v1/user/:id/profile/image',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:id/profile/image'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var fileName = req.body.fileName;
+      var errMsg, sucMsg;
+
+      async.waterfall([
+        function(done) {
+
+          // Download image from temp bucket
+          var localPath = './' + fileName;
+
+          var params = {
+            localFile: localPath,
+            s3Params: {
+              Bucket: auth.amazon_s3.BUCKET_TEMPORARY,
+              Key: fileName
+            }
+          };
+
+          var downloader = s3Client.downloadFile(params);
+
+          downloader.on('error', function(err) {
+            console.log('Unable to download from temp bucket:', err.stack);
+          });
+
+          downloader.on('end', function() {
+            sucMsg = 'Successful download from temp bucket';
+            console.log(sucMsg.blue);
+            done(null, localPath);
+          });
+        },
+        // PROCESS IMAGE
+        function(localPath, done) {
+
+          // Upload image to permanent bucket
+          var destPath = hashids.encryptHex(req.user._id) + '/profile' + '/' + fileName;
+
+          var params = {
+            localFile: localPath,
+            s3Params: {
+              Bucket: auth.amazon_s3.BUCKET_PERMANENT,
+              Key: destPath
+            }
+          };
+          var uploader = s3Client.uploadFile(params);
+
+          uploader.on('error', function(err) {
+            console.log('Unable to upload to permanent bucket:', err.stack);
+          });
+
+          uploader.on('end', function() {
+            sucMsg = 'Successful upload to permanent bucket';
+            console.log(sucMsg.blue);
+            done(null, destPath);
+          });
+        },
+        function(destPath, done) {
+          var profileUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+          done(null, profileUrl);
+        }
+      ], function(err, profileUrl) {
+          console.log(profileUrl);
+          res.status(200).send({
+            type       : 'success',
+            profileUrl : profileUrl
+          });
+      });
+    }
+  );
+
+  /**
+   * Upload image for user profile
+   */
+  app.post('/api/v1/user/:id/upload/image',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:id/upload/image'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var form = new multiparty.Form();
+      form.parse(req, function(err, fields, files) {
+        var file        = files.file[0];
+        console.log(file);
+        console.log(file.type);
+        var contentType = file.headers['content-type'];
+        var extension   = file.path.substring(file.path.lastIndexOf('.'));
+        var destPath    = '/' + req.user._id + '/profile' + '/' + uuid.v4() + extension;
+
+        // server side file type checker
+        if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
+          errMsg = 'Unsupported file type for image upload.';
+          console.log(errMsg.red);
+          fs.unlink(tmpPath);
+          res.status(400).send({
+            type    : 'bad_request',
+            message : errMsg
+          });
+        }
+
+        var params = {
+          localFile: file.path,
+          s3Params: {
+            Bucket: auth.amazon_s3.BUCKET_NAME_PERMANENT,
+            Key: destPath
+          }
+        };
+
+        var uploader = s3Client.uploadFile(params);
+
+        uploader.on('error', function(err) {
+          console.log('Error: ' + err);
+        });
+
+        uploader.on('end', function() {
+          console.log('Successful upload');
+        });
+
+        // var s3Bucket = new AWS.S3({
+        //   params: {
+        //     Bucket: auth.amazon_s3.BUCKET_NAME_PERMANENT
+        //   }
+        // });
+
+        // var data = { Key: destPath, Body: file };
+
+        // s3Bucket.putObject(data, function(err, data) {
+        //   if (err) {
+        //     console.log('error upload data:', data);
+        //     console.log(err);
+        //   } else {
+        //     console.log('Uploaded file');
+        //   }
+        // });
+
+        // s3.putObject({
+        //   Bucket : auth.amazon_s3.BUCKET_NAME_PERMANENT,
+        //   Key    : destPath,
+        //   Body   : file
+        // }, function(err, data) {
+        //   if (err) {
+        //     console.log('error upload data:', data);
+        //     console.log(err);
+        //   } else {
+        //     console.log('Uploaded file');
+        //   }
+        // });
+
+      });
+    }
+  );
+
 };
+
+// s3.putObject({
+//   Bucket : auth.amazon_s3.BUCKET_PERMANENT,
+//   Key    : destPath,
+//   Body   : localPath
+// }, function(err, data) {
+//   if (err) {
+//     console.log('error upload data:', data);
+//     console.log(err);
+//   } else {
+//     console.log('Uploaded file');
+//   }
+// });
