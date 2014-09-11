@@ -165,6 +165,7 @@ module.exports = function(app) {
           newUser.local.displayName = req.body.displayName;
           newUser.email             = req.body.email;
           newUser.password          = newUser.generateHash(req.body.password);
+          newUser.profileImageUrl   = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
           // Save new user to the database
           newUser.save(function(err) {
@@ -524,9 +525,10 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser         = new UserModel();
-                newUser.facebook    = profile.id;
-                newUser.displayName = profile.name;
+                var newUser             = new UserModel();
+                newUser.facebook        = profile.id;
+                newUser.displayName     = profile.name;
+                newUser.profileImageUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -623,9 +625,10 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser         = new UserModel();
-                newUser.github      = profile.id;
-                newUser.displayName = profile.name;
+                var newUser             = new UserModel();
+                newUser.github          = profile.id;
+                newUser.displayName     = profile.name;
+                newUser.profileImageUrl = 'https://avatars.githubusercontent.com/u/1514352?v=2';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -722,9 +725,10 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser         = new UserModel();
-                newUser.google      = profile.sub;
-                newUser.displayName = profile.name;
+                var newUser             = new UserModel();
+                newUser.google          = profile.sub;
+                newUser.displayName     = profile.name;
+                newUser.profileImageUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -758,7 +762,7 @@ module.exports = function(app) {
       // req.user retrieved from ensureAuthenticated() middleware
       res.status(200).send({
         id              : hashids.encryptHex(req.user._id),
-        displayName     : req.user.local.displayName,
+        displayName     : req.user.local.displayName || req.user.displayName,
         joinedDate      : req.user.createdAt,
         email           : req.user.email,
         profileImageUrl : req.user.profileImageUrl
