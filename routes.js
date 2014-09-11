@@ -15,6 +15,7 @@ var multiparty    = require('multiparty');
 var uuid          = require('uuid');
 var s3            = require('s3');
 var AWS           = require('aws-sdk');
+var fs            = require('fs');
 var UserModel     = require('./models/user.js');
 var auth          = require('./config/auth');
 
@@ -756,10 +757,11 @@ module.exports = function(app) {
 
       // req.user retrieved from ensureAuthenticated() middleware
       res.status(200).send({
-        id          : hashids.encryptHex(req.user._id),
-        displayName : req.user.local.displayName,
-        email       : req.user.email,
-        joinedDate  : req.user.createdAt
+        id              : hashids.encryptHex(req.user._id),
+        displayName     : req.user.local.displayName,
+        joinedDate      : req.user.createdAt,
+        email           : req.user.email,
+        profileImageUrl : req.user.profileImageUrl
       });
 
     }
@@ -936,18 +938,52 @@ module.exports = function(app) {
           uploader.on('end', function() {
             sucMsg = 'Successful upload to permanent bucket';
             console.log(sucMsg.blue);
+
+            // delete temp file
+            fs.unlink(localPath, function(err) {
+              if (err) {
+                console.log('Unable to delete temp file:', err.stack);
+              } else {
+                sucMsg = 'Successful deletion of temporary file';
+                console.log(sucMsg.blue);
+              }
+            });
             done(null, destPath);
           });
         },
         function(destPath, done) {
-          var profileUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
-          done(null, profileUrl);
+          var profileImageUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+
+          // save url to db
+          UserModel.findById(req.user._id, function(err, user) {
+            if (err) {
+              res.message = 'The user could not be found.';
+              return next(err);
+            } else if (!user) {
+              var errMsg = 'The user could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              user.profileImageUrl = profileImageUrl || user.profileImageUrl;
+              user.save(function(err) {
+                if (err) {
+                  res.message = 'The user could not be saved to the database.';
+                  return next(err);
+                } else {
+                  done(null, profileImageUrl);
+                }
+              });
+            }
+          });
         }
-      ], function(err, profileUrl) {
-          console.log(profileUrl);
+      ], function(err, profileImageUrl) {
+          console.log('Image found at:', profileImageUrl);
           res.status(200).send({
-            type       : 'success',
-            profileUrl : profileUrl
+            type            : 'success',
+            profileImageUrl : profileImageUrl
           });
       });
     }

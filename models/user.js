@@ -18,7 +18,7 @@ var UserSchema = new Schema({
   displayName: { type: String },
   email: { type: String, trim: true },
   password: { type: String },
-  profilePicUrl: { type: String },
+  profileImageUrl: { type: String },
 
   local: {
     displayName: { type: String, unique: true, trim: true }
