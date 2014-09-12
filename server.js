@@ -15,6 +15,8 @@ try {
   var cors         = require('cors');
   var app          = express();
   var PrettyError  = require('pretty-error');
+  var cool         = require('cool-ascii-faces');
+  var superb       = require('superb');
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
 
@@ -77,7 +79,8 @@ try {
 
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {
-    message = '\nExpress server listening on port ' + app.get('port');
+    message = '\n' + superb() + '! ' + cool().yellow + '\nThe express server is now ' +
+      'listening on port ' + app.get('port') + '.';
     console.log(message.bold.blue);
   });
 }
