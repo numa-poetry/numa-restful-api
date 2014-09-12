@@ -165,7 +165,7 @@ module.exports = function(app) {
           newUser.local.displayName = req.body.displayName;
           newUser.email             = req.body.email;
           newUser.password          = newUser.generateHash(req.body.password);
-          newUser.profileImageUrl   = 'http://api.randomuser.me/portraits/lego/1.jpg';
+          newUser.avatarUrl   = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
           // Save new user to the database
           newUser.save(function(err) {
@@ -528,7 +528,7 @@ module.exports = function(app) {
                 var newUser             = new UserModel();
                 newUser.facebook        = profile.id;
                 newUser.displayName     = profile.name;
-                newUser.profileImageUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
+                newUser.avatarUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -628,7 +628,7 @@ module.exports = function(app) {
                 var newUser             = new UserModel();
                 newUser.github          = profile.id;
                 newUser.displayName     = profile.name;
-                newUser.profileImageUrl = 'https://avatars.githubusercontent.com/u/1514352?v=2';
+                newUser.avatarUrl = 'https://avatars.githubusercontent.com/u/1514352?v=2';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -728,7 +728,7 @@ module.exports = function(app) {
                 var newUser             = new UserModel();
                 newUser.google          = profile.sub;
                 newUser.displayName     = profile.name;
-                newUser.profileImageUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
+                newUser.avatarUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -765,7 +765,7 @@ module.exports = function(app) {
         displayName     : req.user.local.displayName || req.user.displayName,
         joinedDate      : req.user.createdAt,
         email           : req.user.email,
-        profileImageUrl : req.user.profileImageUrl
+        avatarUrl : req.user.avatarUrl
       });
 
     }
@@ -956,7 +956,7 @@ module.exports = function(app) {
           });
         },
         function(destPath, done) {
-          var profileImageUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+          var avatarUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
 
           // save url to db
           UserModel.findById(req.user._id, function(err, user) {
@@ -971,23 +971,23 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
-              user.profileImageUrl = profileImageUrl || user.profileImageUrl;
+              user.avatarUrl = avatarUrl || user.avatarUrl;
               user.save(function(err) {
                 if (err) {
                   res.message = 'The user could not be saved to the database.';
                   return next(err);
                 } else {
-                  done(null, profileImageUrl);
+                  done(null, avatarUrl);
                 }
               });
             }
           });
         }
-      ], function(err, profileImageUrl) {
-          console.log('Image found at:', profileImageUrl);
+      ], function(err, avatarUrl) {
+          console.log('Image found at:', avatarUrl);
           res.status(200).send({
             type            : 'success',
-            profileImageUrl : profileImageUrl
+            avatarUrl : avatarUrl
           });
       });
     }

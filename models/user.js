@@ -1,47 +1,46 @@
 'use strict';
 
 var mongoose           = require('mongoose');
-var Schema             = mongoose.Schema;
 var bcrypt             = require('bcrypt-nodejs');
 var timestamps         = require('mongoose-timestamp');
+var Schema             = mongoose.Schema;
 var SALT_WORK_FACTOR   = 10;
 var MAX_LOGIN_ATTEMPTS = 5;
 var LOCK_TIME          = 60 * 60 * 1000; // 1 hour lock (ms)
 
 // schema ----------------------------------------------------------------------
-var UserSchema = new Schema({
+var userSchema = new Schema({
 
-  github: { type: String },
-  google: { type: String },
-  facebook: { type: String },
+  // oauth ids
+  github               : { type: String },
+  google               : { type: String },
+  facebook             : { type: String },
 
-  displayName: { type: String },
-  email: { type: String, trim: true },
-  password: { type: String },
-  profileImageUrl: { type: String },
+  displayName          : { type: String },
+  email                : { type: String, trim: true },
+  password             : { type: String },
+  avatarUrl            : { type: String },
 
-  local: {
-    displayName: { type: String, unique: true, trim: true }
-  },
+  local                : { displayName: { type: String, unique: true, trim: true } },
 
-  loginAttempts: { type: Number, required: true, default: 0 },
-  lockUntil: { type: Number },
+  loginAttempts        : { type: Number, required: true, default: 0 },
+  lockUntil            : { type: Number },
 
-  resetPasswordToken: { type: String },
-  resetPasswordExpires: { type: Date }
+  resetPasswordToken   : { type: String },
+  resetPasswordExpires : { type: Date }
 
 });
 
-UserSchema.virtual('isLocked').get(function() {
+userSchema.virtual('isLocked').get(function() {
   // check for a future lockUntil timestamp
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 // plugins ---------------------------------------------------------------------
-UserSchema.plugin(timestamps);
+userSchema.plugin(timestamps);
 
 // methods ---------------------------------------------------------------------
-UserSchema.methods.comparePassword = function(candidatePassword, cb) {
+userSchema.methods.comparePassword = function(candidatePassword, cb) {
   bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
     if (err) {
       return cb(err);
@@ -50,11 +49,11 @@ UserSchema.methods.comparePassword = function(candidatePassword, cb) {
   });
 };
 
-UserSchema.methods.generateHash = function(password) {
+userSchema.methods.generateHash = function(password) {
   return bcrypt.hashSync(password, bcrypt.genSaltSync(SALT_WORK_FACTOR), null);
 };
 
-// UserSchema.pre('save', function(next) {
+// userSchema.pre('save', function(next) {
 //   var user = this;
 
 //   // only hash the password if it has been modified (or is new)
@@ -75,11 +74,11 @@ UserSchema.methods.generateHash = function(password) {
 //   });
 // });
 
-UserSchema.methods.validPassword = function(password) {
+userSchema.methods.validPassword = function(password) {
   return bcrypt.compareSync(password, this.password);
 };
 
-UserSchema.methods.incLoginAttempts = function(cb) {
+userSchema.methods.incLoginAttempts = function(cb) {
   // if we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.update({
@@ -99,7 +98,7 @@ UserSchema.methods.incLoginAttempts = function(cb) {
 };
 
 // Sanitize
-// UserSchema.methods.toJSON = function() {
+// userSchema.methods.toJSON = function() {
 //   var user = this.toObject();
 //   delete user._id;
 //   delete user.__v;
@@ -111,13 +110,13 @@ UserSchema.methods.incLoginAttempts = function(cb) {
 
 // statics ---------------------------------------------------------------------
 // Expose enum on the model, and provide an internal convenience reference
-var reasons = UserSchema.statics.failedLogin = {
+var reasons = userSchema.statics.failedLogin = {
   NOT_FOUND          : 0,
   PASSWORD_INCORRECT : 1,
   MAX_ATTEMPTS       : 2
 };
 
-UserSchema.statics.getAuthenticated = function(displayName, password, cb) {
+userSchema.statics.getAuthenticated = function(displayName, password, cb) {
 
   this.findOne({
     'local.displayName': displayName
@@ -179,4 +178,4 @@ UserSchema.statics.getAuthenticated = function(displayName, password, cb) {
   });
 };
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);
