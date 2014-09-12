@@ -14,6 +14,7 @@ try {
   var colors       = require('colors');
   var cors         = require('cors');
   var app          = express();
+  var PrettyError  = require('pretty-error');
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
 
@@ -59,13 +60,20 @@ try {
   require('./routes.js')(app);
 
 // middleware ------------------------------------------------------------------
+  var pe = new PrettyError();
+
   app.use(function(err, req, res, next) {
-    console.log(err.stack);
+    // console.log(err.stack);
+    console.log(pe.render(err));
     res.status(500).send({
       type    : 'internal_server_error',
       message : res.message
     });
   });
+
+  // simplify stack trace
+  pe.skipNodeFiles(); // this will skip events.js and http.js and similar core node files
+  pe.skipPackage('express'); // this will skip all the trace lines about express` core and sub-modules
 
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {
