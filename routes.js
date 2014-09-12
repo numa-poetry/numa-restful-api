@@ -725,10 +725,17 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser             = new UserModel();
-                newUser.google          = profile.sub;
-                newUser.displayName     = profile.name;
-                newUser.avatarUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
+                var newUser         = new UserModel();
+                newUser.google      = profile.sub;
+                newUser.displayName = profile.name;
+
+                // Google returns profile picture as .../photo.jpg?sz=50
+                // So we'll cut the chars from the ? on to have access to the
+                // full size image
+                var avatar        = profile.picture;
+                var charToRemove  = avatar.indexOf('?');
+                avatar            = avatar.substring(0, charToRemove = -1 ? charToRemove : avatar.length);
+                newUser.avatarUrl = avatar;
 
                 newUser.save(function(err) {
                   if (err) {
@@ -754,20 +761,31 @@ module.exports = function(app) {
    * Get a user
    */
   app.get('/api/v1/user/:id',
-    ensureAuthenticated,
     function(req, res, next) {
       console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      // req.user retrieved from ensureAuthenticated() middleware
-      res.status(200).send({
-        id              : hashids.encryptHex(req.user._id),
-        displayName     : req.user.local.displayName || req.user.displayName,
-        joinedDate      : req.user.createdAt,
-        email           : req.user.email,
-        avatarUrl : req.user.avatarUrl
+      UserModel.findById(hashids.decryptHex(req.params.id), function(err, user) {
+        if (err) {
+          res.message = 'The user could not be found.';
+          return next(err);
+        } else if (!user) {
+          var errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          res.status(200).send({
+            id          : hashids.encryptHex(user._id),
+            displayName : user.local.displayName || user.displayName,
+            joinedDate  : user.createdAt,
+            email       : user.email, // privacy (don't display to others) need to return only when called by logged-in user
+            avatarUrl   : user.avatarUrl
+          });
+        }
       });
-
     }
   );
 

@@ -13,7 +13,8 @@ var poemSchema = new Schema({
   title       : { type: String },
   tags        : [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
   comments    : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
-  votes       : { type: Number },
+  upvotes     : { type: Number },
+  downvotes   : { type: Number },
   inspiration : { type: String }
 });
 
