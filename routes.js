@@ -16,7 +16,8 @@ var uuid          = require('uuid');
 var s3            = require('s3');
 var AWS           = require('aws-sdk');
 var fs            = require('fs');
-var UserModel     = require('./models/user.js');
+var User          = require('./models/user.js');
+var Poem          = require('./models/poem.js');
 var auth          = require('./config/auth');
 
 // Pass unique salt value
@@ -85,7 +86,7 @@ module.exports = function(app) {
     } else {
 
       // Verify user exists
-      UserModel.findById(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user is not authorized to access this resource.';
           return next(err);
@@ -145,7 +146,7 @@ module.exports = function(app) {
       var errMsg;
 
       // Verify displayName isn't taken
-      UserModel.findOne({
+      User.findOne({
         'local.displayName' : req.body.displayName
       }, function(err, user) {
         if (err) {
@@ -161,21 +162,17 @@ module.exports = function(app) {
         } else {
 
           // Build new user
-          var newUser               = new UserModel();
+          var newUser               = new User();
           newUser.local.displayName = req.body.displayName;
           newUser.email             = req.body.email;
           newUser.password          = newUser.generateHash(req.body.password);
-          newUser.avatarUrl   = 'http://api.randomuser.me/portraits/lego/1.jpg';
+          newUser.avatarUrl         = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
           // Save new user to the database
           newUser.save(function(err) {
             if (err) {
-              console.log(err);
-              res.status(500).send({
-                type    : 'internal_server_error',
-                message : err
-              });
-              return next(err, 'The user could not be saved to the database.');
+              res.message = 'The user could not be saved to the database.';
+              return next(err);
             } else {
               newUser = newUser.toObject();
               delete newUser.password;
@@ -202,10 +199,11 @@ module.exports = function(app) {
       var errMsg;
 
       // http://devsmash.com/blog/implementing-max-login-attempts-with-mongoose
-      UserModel.getAuthenticated(req.body.displayName, req.body.password,
+      User.getAuthenticated(req.body.displayName, req.body.password,
         function(err, user, reason) {
           if (err) {
-            return next(err, 'The user could not be logged in.');
+            res.message = 'The user could not be logged in.';
+            return next(err);
           } else if (user) {
             console.log('login successful'.green);
             user = user.toObject();
@@ -218,7 +216,7 @@ module.exports = function(app) {
           } else {
 
             // otherwise we can determine why we failed
-            var reasons = UserModel.failedLogin;
+            var reasons = User.failedLogin;
             switch (reason) {
               case reasons.NOT_FOUND:
                 errMsg = 'The user does not exist.';
@@ -279,7 +277,7 @@ module.exports = function(app) {
               message : errMsg
             });
           } else {
-            UserModel.findOne({ 'email': req.body.email }, function(err, user) {
+            User.findOne({ 'email': req.body.email }, function(err, user) {
               if (!user) {
                 errMsg = 'No account with that email address exists.';
                 console.log(errMsg.red);
@@ -327,7 +325,8 @@ module.exports = function(app) {
         }
       ], function(err, user) {
         if (err) {
-          return next(err, 'Could not send email to reset password.');
+          res.message = 'Could not send email to reset password.';
+          return next(err);
         } else {
           var sucMsg = 'An email has been sent to ' + user.email + ' with further instructions.';
           console.log(sucMsg.green);
@@ -344,7 +343,7 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/reset/:token'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      UserModel.findOne({
+      User.findOne({
         resetPasswordToken   : req.params.token,
         resetPasswordExpires : {
           $gt : moment().valueOf()
@@ -378,7 +377,7 @@ module.exports = function(app) {
 
       async.waterfall([
         function(done) {
-          UserModel.findOne({
+          User.findOne({
             resetPasswordToken   : req.params.token,
             resetPasswordExpires : {
               $gt : moment().valueOf()
@@ -439,7 +438,8 @@ module.exports = function(app) {
       ],
       function(err, user) {
         if (err) {
-          return next(err, 'Could not send changed password confirmation email.');
+          res.message = 'Could not send changed password confirmation email.';
+          return next(err);
         } else {
           var sucMsg = 'A changed password confirmation email has been sent to ' + user.email;
           console.log(sucMsg.green);
@@ -478,7 +478,7 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'facebook': profile.id }, function(err, existingUser) {
+            User.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a Facebook account that belongs to you' });
               } else {
@@ -486,7 +486,7 @@ module.exports = function(app) {
                 var token   = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
+                User.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
@@ -514,7 +514,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'facebook': profile.id }, function(err, existingUser) {
+            User.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
@@ -525,10 +525,10 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser             = new UserModel();
-                newUser.facebook        = profile.id;
-                newUser.displayName     = profile.name;
-                newUser.avatarUrl = 'http://api.randomuser.me/portraits/lego/1.jpg';
+                var newUser         = new User();
+                newUser.facebook    = profile.id;
+                newUser.displayName = profile.name;
+                newUser.avatarUrl   = 'http://api.randomuser.me/portraits/lego/1.jpg';
 
                 newUser.save(function(err) {
                   if (err) {
@@ -579,14 +579,14 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'github': profile.id }, function(err, existingUser) {
+            User.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a GitHub account that belongs to you' });
               } else {
                 var token   = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
+                User.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   } else {
@@ -614,7 +614,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'github': profile.id }, function(err, existingUser) {
+            User.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
@@ -625,7 +625,7 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser             = new UserModel();
+                var newUser             = new User();
                 newUser.github          = profile.id;
                 newUser.displayName     = profile.name;
                 newUser.avatarUrl = 'https://avatars.githubusercontent.com/u/1514352?v=2';
@@ -680,14 +680,14 @@ module.exports = function(app) {
 
           // Step 3a. If user is already signed in then link accounts.
           if (req.headers.authorization) {
-            UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
+            User.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 return res.status(409).send({ message: 'There is already a Google account that belongs to you' });
               } else {
                 var token = req.headers.authorization.split(' ')[1];
                 var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
-                UserModel.findById(hashids.decryptHex(payload.sub), function(err, user) {
+                User.findById(hashids.decryptHex(payload.sub), function(err, user) {
                   if (!user) {
                     return res.status(400).send({ message: 'User not found' });
                   }
@@ -714,7 +714,7 @@ module.exports = function(app) {
             console.log('PROFILE:', profile);
 
             // Step 3b. Create a new user account or return an existing one.
-            UserModel.findOne({ 'google': profile.sub }, function(err, existingUser) {
+            User.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existingUser');
                 var token = createToken(undefined /* stayLoggedIn */, existingUser);
@@ -725,7 +725,7 @@ module.exports = function(app) {
                 });
               } else {
                 console.log('3b new user');
-                var newUser         = new UserModel();
+                var newUser         = new User();
                 newUser.google      = profile.sub;
                 newUser.displayName = profile.name;
 
@@ -765,7 +765,7 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      UserModel.findById(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
@@ -800,7 +800,7 @@ module.exports = function(app) {
 
       // req.user retrieved from ensureAuthenticated() middleware
       // res.status(200).send({ message : 'TEST' });
-      UserModel.findById(req.user._id, function(err, user) {
+      User.findById(req.user._id, function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
@@ -847,7 +847,7 @@ module.exports = function(app) {
 
       var errMsg, sucMsg;
 
-      UserModel.findByIdAndRemove(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findByIdAndRemove(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user could not be deleted.';
           return next(err);
@@ -880,7 +880,7 @@ module.exports = function(app) {
 
       var errMsg;
 
-      UserModel.find(function(err, users) {
+      User.find(function(err, users) {
         if (err) {
           res.message = 'Could not retrieve all users.';
           return next(err);
@@ -894,6 +894,62 @@ module.exports = function(app) {
           });
         }
         res.status(200).send(users);
+      });
+    }
+  );
+
+  /**
+   * Save a new poem to the database
+   */
+  app.post('/api/v1/user/:id/poem',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/poem'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var sucMsg;
+
+      var newPoem = new Poem({
+        creator : req.user._id,
+        title   : req.body.title,
+        poem    : req.body.poem
+      });
+
+      newPoem.save(function(err, poem) {
+        if (err) {
+          res.message = 'Could not save new poem.';
+          return next(err);
+        } else {
+          User.findById(req.user._id, function(err, user) {
+            if (err) {
+              res.message = 'The user could not be found.';
+              return next(err);
+            } else if (!user) {
+              var errMsg = 'The user could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              user.poems.addToSet(poem._id); // add poem ref to creator
+
+              user.save(function(err) {
+                if (err) {
+                  res.message = 'Could not save poem ref to user.';
+                  return next(err);
+                } else {
+                  var sucMsg = 'The poem was saved.';
+                  console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type    : 'success',
+                    message : sucMsg
+                  });
+                }
+              });
+            }
+          });
+        }
       });
     }
   );
@@ -977,7 +1033,7 @@ module.exports = function(app) {
           var avatarUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
 
           // save url to db
-          UserModel.findById(req.user._id, function(err, user) {
+          User.findById(req.user._id, function(err, user) {
             if (err) {
               res.message = 'The user could not be found.';
               return next(err);

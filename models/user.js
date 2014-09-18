@@ -3,6 +3,7 @@
 var mongoose           = require('mongoose');
 var bcrypt             = require('bcrypt-nodejs');
 var timestamps         = require('mongoose-timestamp');
+var Poem               = require('./poem.js');
 var Schema             = mongoose.Schema;
 var SALT_WORK_FACTOR   = 10;
 var MAX_LOGIN_ATTEMPTS = 5;
@@ -27,7 +28,9 @@ var userSchema = new Schema({
   lockUntil            : { type: Number },
 
   resetPasswordToken   : { type: String },
-  resetPasswordExpires : { type: Date }
+  resetPasswordExpires : { type: Date },
+
+  poems                : [{ type: Schema.Types.ObjectId, ref: 'Poem' }]
 
 });
 

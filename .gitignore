@@ -33,3 +33,6 @@ node_modules
 
 ### Server ###
 logfile.txt
+
+# Credentials
+config/auth.js

@@ -2,7 +2,7 @@
 
 var mongoose   = require('mongoose');
 var timestamps = require('mongoose-timestamp');
-var Poem       = require('./models/poem.js');
+var Poem       = require('./poem.js');
 var Schema     = mongoose.Schema;
 
 // schema ----------------------------------------------------------------------

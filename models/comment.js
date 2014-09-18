@@ -2,13 +2,13 @@
 
 var mongoose   = require('mongoose');
 var timestamps = require('mongoose-timestamp');
-var User       = require('./models/user.js');
-var Poem       = require('./models/poem.js');
+var User       = require('./user.js');
+var Poem       = require('./poem.js');
 var Schema     = mongoose.Schema;
 
 // schema ----------------------------------------------------------------------
 var commentSchema = new Schema({
-  _creator : { type: Schema.Types.ObjectId, ref: 'User' },
+  creator  : { type: Schema.Types.ObjectId, ref: 'User' },
   poem     : { type: Schema.Types.ObjectId, ref: 'Poem' },
   comment  : { type: String }
 });
