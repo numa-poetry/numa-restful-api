@@ -1,10 +1,7 @@
 # Numa RESTful API
 
 ## What?
-"Numa" is derived from "pneúma", meaning wind, breath, spirit.
-
-## Wait, what?
-This is the repo for Numa's backend API, RESTful in nature, and a work in progress. Numa is becoming a hub for sharing poetry, musings, and free-form diction. It will be a platform to garner feedback and connect with others. This backend will provide a API to build clients upon.
+"Numa" is derived from "pneúma", meaning wind, breath, spirit. This is the repo for Numa's AngularJS client, a work in progress and descendant of [Warrior Poets](https://github.com/trance-with-me/Warrior-Poets). Numa is becoming a hub for sharing poetry, musings, and free-form diction. It will be a platform to garner feedback and connect with others. This backend will provide the API to build clients upon.
 
 ## Why?
 I'm developing Numa because I care about connecting with people; sharing expressive works with my friends and family; and having a clean, dynamic, and modern web application for sharing any form of lyrical expression.
