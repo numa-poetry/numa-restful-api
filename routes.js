@@ -14,7 +14,7 @@ var Hashids       = require('hashids');
 var multiparty    = require('multiparty');
 var uuid          = require('uuid');
 var s3            = require('s3');
-var AWS           = require('aws-sdk');
+// var AWS           = require('aws-sdk');
 var fs            = require('fs');
 var User          = require('./models/user.js');
 var Poem          = require('./models/poem.js');
@@ -30,10 +30,10 @@ var s3Client = s3.createClient({
   }
 });
 
-AWS.config.update({
-  accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
-  secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
-});
+// AWS.config.update({
+//   accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
+//   secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
+// });
 
 // var s3 = new AWS.S3();
 
@@ -977,7 +977,6 @@ module.exports = function(app) {
     }
   );
 
-
   /**
    * Get a user's comments
    */
@@ -1072,74 +1071,169 @@ module.exports = function(app) {
    * to permanent S3 bucket
    * http://www.cheynewallace.com/uploading-to-s3-with-angularjs/
    */
-  app.post('/api/v1/user/:id/profile/image',
+  // app.post('/api/v1/user/:id/avatar',
+  //   ensureAuthenticated,
+  //   function(req, res, next) {
+  //     console.log('\n[POST] /api/v1/user/:id/avatar'.bold.green);
+  //     console.log('Request body:'.green, req.body);
+
+  //     var fileName = req.body.fileName;
+  //     var errMsg, sucMsg;
+
+  //     async.waterfall([
+  //       function(done) {
+
+  //         // Download image from temp bucket
+  //         var localPath = './' + fileName;
+
+  //         var params = {
+  //           localFile: localPath,
+  //           s3Params: {
+  //             Bucket: auth.amazon_s3.BUCKET_TEMPORARY,
+  //             Key: fileName
+  //           }
+  //         };
+
+  //         var downloader = s3Client.downloadFile(params);
+
+  //         downloader.on('error', function(err) {
+  //           console.log('Unable to download from temp bucket:', err.stack);
+  //         });
+
+  //         downloader.on('end', function() {
+  //           sucMsg = 'Successful download from temp bucket';
+  //           console.log(sucMsg.blue);
+  //           done(null, localPath);
+  //         });
+  //       },
+  //       // PROCESS IMAGE
+  //       function(localPath, done) {
+
+  //         // Upload image to permanent bucket
+  //         var destPath = hashids.encryptHex(req.user._id) + '/profile' + '/' + fileName;
+
+  //         var params = {
+  //           localFile: localPath,
+  //           s3Params: {
+  //             Bucket: auth.amazon_s3.BUCKET_PERMANENT,
+  //             Key: destPath
+  //           }
+  //         };
+  //         var uploader = s3Client.uploadFile(params);
+
+  //         uploader.on('error', function(err) {
+  //           console.log('Unable to upload to permanent bucket:', err.stack);
+  //         });
+
+  //         uploader.on('end', function() {
+  //           sucMsg = 'Successful upload to permanent bucket';
+  //           console.log(sucMsg.blue);
+
+  //           // delete temp file
+  //           fs.unlink(localPath, function(err) {
+  //             if (err) {
+  //               console.log('Unable to delete temp file:', err.stack);
+  //             } else {
+  //               sucMsg = 'Successful deletion of temporary file';
+  //               console.log(sucMsg.blue);
+  //             }
+  //           });
+  //           done(null, destPath);
+  //         });
+  //       },
+  //       function(destPath, done) {
+  //         var avatarUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+
+  //         // save url to db
+  //         User.findById(req.user._id, function(err, user) {
+  //           if (err) {
+  //             res.message = 'The user could not be found.';
+  //             return next(err);
+  //           } else if (!user) {
+  //             var errMsg = 'The user could not be found.';
+  //             console.log(errMsg.red);
+  //             res.status(404).send({
+  //               type    : 'not_found',
+  //               message : errMsg
+  //             });
+  //           } else {
+  //             user.avatarUrl = avatarUrl || user.avatarUrl;
+  //             user.save(function(err) {
+  //               if (err) {
+  //                 res.message = 'The user could not be saved to the database.';
+  //                 return next(err);
+  //               } else {
+  //                 done(null, avatarUrl);
+  //               }
+  //             });
+  //           }
+  //         });
+  //       }
+  //     ], function(err, avatarUrl) {
+  //         console.log('Image found at:', avatarUrl);
+  //         res.status(200).send({
+  //           type            : 'success',
+  //           avatarUrl : avatarUrl
+  //         });
+  //     });
+  //   }
+  // );
+
+  /**
+   * Upload avatar for user profile
+   */
+  app.post('/api/v1/user/:id/avatar',
     ensureAuthenticated,
     function(req, res, next) {
-      console.log('\n[POST] /api/v1/user/:id/profile/image'.bold.green);
+      console.log('\n[POST] /api/v1/user/:id/avatar'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      var fileName = req.body.fileName;
       var errMsg, sucMsg;
 
       async.waterfall([
         function(done) {
 
-          // Download image from temp bucket
-          var localPath = './' + fileName;
+          // Upload avatar to S3
+          var form = new multiparty.Form();
+          form.parse(req, function(err, fields, files) {
+            var file        = files.file[0];
+            console.log(file);
+            var contentType = file.headers['content-type'];
+            var extension   = file.path.substring(file.path.lastIndexOf('.'));
+            var destPath    = hashids.encryptHex(req.user._id) + '/profile/' + uuid.v4() + extension; // file.originalFilename
 
-          var params = {
-            localFile: localPath,
-            s3Params: {
-              Bucket: auth.amazon_s3.BUCKET_TEMPORARY,
-              Key: fileName
+            // server side file type checker
+            if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
+              errMsg = 'Unsupported file type for image upload.';
+              console.log(errMsg.red);
+              fs.unlink(tmpPath);
+              res.status(400).send({
+                type    : 'bad_request',
+                message : errMsg
+              });
             }
-          };
 
-          var downloader = s3Client.downloadFile(params);
-
-          downloader.on('error', function(err) {
-            console.log('Unable to download from temp bucket:', err.stack);
-          });
-
-          downloader.on('end', function() {
-            sucMsg = 'Successful download from temp bucket';
-            console.log(sucMsg.blue);
-            done(null, localPath);
-          });
-        },
-        // PROCESS IMAGE
-        function(localPath, done) {
-
-          // Upload image to permanent bucket
-          var destPath = hashids.encryptHex(req.user._id) + '/profile' + '/' + fileName;
-
-          var params = {
-            localFile: localPath,
-            s3Params: {
-              Bucket: auth.amazon_s3.BUCKET_PERMANENT,
-              Key: destPath
-            }
-          };
-          var uploader = s3Client.uploadFile(params);
-
-          uploader.on('error', function(err) {
-            console.log('Unable to upload to permanent bucket:', err.stack);
-          });
-
-          uploader.on('end', function() {
-            sucMsg = 'Successful upload to permanent bucket';
-            console.log(sucMsg.blue);
-
-            // delete temp file
-            fs.unlink(localPath, function(err) {
-              if (err) {
-                console.log('Unable to delete temp file:', err.stack);
-              } else {
-                sucMsg = 'Successful deletion of temporary file';
-                console.log(sucMsg.blue);
+            var params = {
+              localFile: file.path,
+              s3Params: {
+                Bucket: auth.amazon_s3.BUCKET_PERMANENT,
+                Key: destPath
               }
+            };
+
+            var uploader = s3Client.uploadFile(params);
+
+            uploader.on('error', function(err) {
+              errMsg = 'Unable to upload to permanent bucket.';
+              console.log(errMsg.red);
+              return next(err);
             });
-            done(null, destPath);
+
+            uploader.on('end', function() {
+              sucMsg = 'Successful upload to permanent bucket.';
+              console.log(sucMsg.blue);
+              done(null, destPath);
+            });
           });
         },
         function(destPath, done) {
@@ -1180,98 +1274,4 @@ module.exports = function(app) {
     }
   );
 
-  /**
-   * Upload image for user profile
-   */
-  app.post('/api/v1/user/:id/upload/image',
-    ensureAuthenticated,
-    function(req, res, next) {
-      console.log('\n[POST] /api/v1/user/:id/upload/image'.bold.green);
-      console.log('Request body:'.green, req.body);
-
-      var form = new multiparty.Form();
-      form.parse(req, function(err, fields, files) {
-        var file        = files.file[0];
-        console.log(file);
-        console.log(file.type);
-        var contentType = file.headers['content-type'];
-        var extension   = file.path.substring(file.path.lastIndexOf('.'));
-        var destPath    = '/' + req.user._id + '/profile' + '/' + uuid.v4() + extension;
-
-        // server side file type checker
-        if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
-          errMsg = 'Unsupported file type for image upload.';
-          console.log(errMsg.red);
-          fs.unlink(tmpPath);
-          res.status(400).send({
-            type    : 'bad_request',
-            message : errMsg
-          });
-        }
-
-        var params = {
-          localFile: file.path,
-          s3Params: {
-            Bucket: auth.amazon_s3.BUCKET_NAME_PERMANENT,
-            Key: destPath
-          }
-        };
-
-        var uploader = s3Client.uploadFile(params);
-
-        uploader.on('error', function(err) {
-          console.log('Error: ' + err);
-        });
-
-        uploader.on('end', function() {
-          console.log('Successful upload');
-        });
-
-        // var s3Bucket = new AWS.S3({
-        //   params: {
-        //     Bucket: auth.amazon_s3.BUCKET_NAME_PERMANENT
-        //   }
-        // });
-
-        // var data = { Key: destPath, Body: file };
-
-        // s3Bucket.putObject(data, function(err, data) {
-        //   if (err) {
-        //     console.log('error upload data:', data);
-        //     console.log(err);
-        //   } else {
-        //     console.log('Uploaded file');
-        //   }
-        // });
-
-        // s3.putObject({
-        //   Bucket : auth.amazon_s3.BUCKET_NAME_PERMANENT,
-        //   Key    : destPath,
-        //   Body   : file
-        // }, function(err, data) {
-        //   if (err) {
-        //     console.log('error upload data:', data);
-        //     console.log(err);
-        //   } else {
-        //     console.log('Uploaded file');
-        //   }
-        // });
-
-      });
-    }
-  );
-
 };
-
-// s3.putObject({
-//   Bucket : auth.amazon_s3.BUCKET_PERMANENT,
-//   Key    : destPath,
-//   Body   : localPath
-// }, function(err, data) {
-//   if (err) {
-//     console.log('error upload data:', data);
-//     console.log(err);
-//   } else {
-//     console.log('Uploaded file');
-//   }
-// });
