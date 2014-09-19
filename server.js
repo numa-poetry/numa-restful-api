@@ -13,12 +13,12 @@ try {
   var errorhandler = require('errorhandler');
   var colors       = require('colors');
   var cors         = require('cors');
-  var app          = express();
   var PrettyError  = require('pretty-error');
   var cool         = require('cool-ascii-faces');
   var superb       = require('superb');
   var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
+  var app          = express();
 
 // db config -------------------------------------------------------------------
   mongoose.connect(db.MONGO_CONNECTION_URI);
@@ -75,7 +75,7 @@ try {
 
   // simplify stack trace
   pe.skipNodeFiles(); // this will skip events.js and http.js and similar core node files
-  pe.skipPackage('express'); // this will skip all the trace lines about express` core and sub-modules
+  pe.skipPackage('express'); // this will skip all the trace lines about express' core and sub-modules
 
 // run server ------------------------------------------------------------------
   app.listen(app.get('port'), function() {

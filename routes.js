@@ -209,6 +209,9 @@ module.exports = function(app) {
             user = user.toObject();
             delete user.password;
             var token = createToken(req.body.stayLoggedIn, user);
+
+            console.log(hashids.encryptHex(user._id));
+
             res.status(201).send({
               id    : hashids.encryptHex(user._id),
               token : token
@@ -759,8 +762,11 @@ module.exports = function(app) {
 
   /**
    * Get a user
+   * Request body:
+   *   If req.body.type === 'Basic', send minimal user info
+   *   If req.body.type === 'Full', send minimal info + poem titles + user comments
    */
-  app.get('/api/v1/user/:id',
+  app.post('/api/v1/user/:id',
     function(req, res, next) {
       console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
@@ -777,13 +783,40 @@ module.exports = function(app) {
             message : errMsg
           });
         } else {
-          res.status(200).send({
-            id          : hashids.encryptHex(user._id),
-            displayName : user.local.displayName || user.displayName,
-            joinedDate  : user.createdAt,
-            email       : user.email, // privacy (don't display to others) need to return only when called by logged-in user
-            avatarUrl   : user.avatarUrl
-          });
+          var resObj         = {};
+          resObj.id          = hashids.encryptHex(user._id);
+          resObj.displayName = user.local.displayName || user.displayName;
+          resObj.joinedDate  = user.createdAt;
+          resObj.email       = user.email;
+          resObj.avatarUrl   = user.avatarUrl;
+
+          if (req.body.type === 'Full') {
+            // gather user poem titles and user comments
+            var poems = [];
+            async.each(user.poems,
+              function(id, callback) {
+                Poem.findById(id, function(err, poem) {
+                  if (poem) {
+                    var poemObj = {};
+                    poemObj.id        = poem._id;
+                    poemObj.title     = poem.title;
+                    poemObj.poem      = poem.poem;
+                    poemObj.createdAt = poem.createdAt;
+                    poems.push(poemObj);
+                    callback();
+                  }
+                });
+              },
+              function(err) {
+                resObj.poems = poems;
+                console.log(resObj);
+                res.status(200).send(resObj);
+              }
+            );
+          } else {
+            console.log(resObj);
+            res.status(200).send(resObj);
+          }
         }
       });
     }
@@ -897,6 +930,86 @@ module.exports = function(app) {
       });
     }
   );
+
+  /**
+   * Get a user's poems
+   */
+  app.get('/api/v1/user/:id/poem',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/poem'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
+        if (err) {
+          res.message = 'The user could not be found.';
+          return next(err);
+        } else if (!user) {
+          var errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          var poems = [];
+
+          // find all user poems by ref id
+          // Need to gather comments
+          async.each(user.poems,
+            function(id, callback) {
+              Poem.findById(id, function(err, poem) {
+                if (poem) {
+                  poem = poem.toObject();
+                  delete poem.__v;
+                  poems.push(poem);
+                  callback();
+                }
+              });
+            },
+            function(err) {
+              // console.log(poems);
+              res.status(200).send(poems);
+            }
+          );
+        }
+      });
+    }
+  );
+
+
+  /**
+   * Get a user's comments
+   */
+  // app.get('/api/v1/user/:id/comments',
+  //   ensureAuthenticated,
+  //   function(req, res, next) {
+  //     console.log('\n[GET] /api/v1/user/:id/comments'.bold.green);
+  //     console.log('Request body:'.green, req.body);
+
+  //     User.findById(hashids.decryptHex(req.params.id), function(err, user) {
+  //       if (err) {
+  //         res.message = 'The user could not be found.';
+  //         return next(err);
+  //       } else if (!user) {
+  //         var errMsg = 'The user could not be found.';
+  //         console.log(errMsg.red);
+  //         res.status(404).send({
+  //           type    : 'not_found',
+  //           message : errMsg
+  //         });
+  //       } else {
+  //         res.status(200).send({
+  //           id          : hashids.encryptHex(user._id),
+  //           displayName : user.local.displayName || user.displayName,
+  //           joinedDate  : user.createdAt,
+  //           email       : user.email, // privacy (don't display to others) need to return only when called by logged-in user
+  //           avatarUrl   : user.avatarUrl
+  //         });
+  //       }
+  //     });
+  //   }
+  // );
 
   /**
    * Save a new poem to the database
