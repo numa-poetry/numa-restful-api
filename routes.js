@@ -14,13 +14,11 @@ var Hashids       = require('hashids');
 var multiparty    = require('multiparty');
 var uuid          = require('uuid');
 var s3            = require('s3');
-// var AWS           = require('aws-sdk');
 var fs            = require('fs');
 var User          = require('./models/user.js');
 var Poem          = require('./models/poem.js');
 var auth          = require('./config/auth');
 
-// Pass unique salt value
 var hashids = new Hashids(auth.HASHIDS_SALT);
 
 var s3Client = s3.createClient({
@@ -29,13 +27,6 @@ var s3Client = s3.createClient({
     secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
   }
 });
-
-// AWS.config.update({
-//   accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
-//   secretAccessKey : auth.amazon_s3.SECRET_ACCESS_KEY
-// });
-
-// var s3 = new AWS.S3();
 
 // routes ----------------------------------------------------------------------
 module.exports = function(app) {
@@ -134,6 +125,21 @@ module.exports = function(app) {
       });
     }
   }
+
+  /**
+   * Welcome
+   */
+  app.get('/',
+    function(req, res) {
+      console.log('\n[GET] /'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      res.status(200).send({
+        type    : 'success',
+        message : 'Welcome to the Numa API! Have fun.'
+      });
+    }
+  );
 
   /**
    * Local signup
