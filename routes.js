@@ -798,7 +798,7 @@ module.exports = function(app) {
                 Poem.findById(id, function(err, poem) {
                   if (poem) {
                     var poemObj = {};
-                    poemObj.id        = poem._id;
+                    poemObj.id        = hashids.encryptHex(poem._id),
                     poemObj.title     = poem.title;
                     poemObj.poem      = poem.poem;
                     poemObj.createdAt = poem.createdAt;
@@ -880,7 +880,7 @@ module.exports = function(app) {
 
       var errMsg, sucMsg;
 
-      User.findByIdAndRemove(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findByIdAndRemove(req.user._id, function(err, user) {
         if (err) {
           res.message = 'The user could not be deleted.';
           return next(err);
@@ -931,47 +931,52 @@ module.exports = function(app) {
     }
   );
 
-  /**
-   * Get a user's poems
+  /*
+   * Get poem by id
    */
-  app.get('/api/v1/user/:id/poem',
-    ensureAuthenticated,
+  app.get('/api/v1/poem/:id',
     function(req, res, next) {
-      console.log('\n[GET] /api/v1/user/:id/poem'.bold.green);
+      console.log('\n[GET] /api/v1/poem/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
+      Poem.findById(hashids.decryptHex(req.params.id), function(err, poem) {
         if (err) {
-          res.message = 'The user could not be found.';
+          res.message = 'The poem could not be found.';
           return next(err);
-        } else if (!user) {
-          var errMsg = 'The user could not be found.';
+        } else if (!poem) {
+          var errMsg = 'The poem could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
             message : errMsg
           });
         } else {
-          var poems = [];
 
-          // find all user poems by ref id
-          // Need to gather comments
-          async.each(user.poems,
-            function(id, callback) {
-              Poem.findById(id, function(err, poem) {
-                if (poem) {
-                  poem = poem.toObject();
-                  delete poem.__v;
-                  poems.push(poem);
-                  callback();
-                }
+          // find creator details
+          User.findById(poem.creator, function(err, user) {
+            if (err || !user) {
+              // maybe send a blank instead of error
+              var errMsg = 'The user could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
               });
-            },
-            function(err) {
-              // console.log(poems);
-              res.status(200).send(poems);
+            } else {
+              var resObj          = {};
+              var creator         = {};
+              creator.id          = user._id;
+              creator.displayName = user.displayName || user.local.displayName;
+              resObj.creator      = creator;
+              poem                = poem.toObject();
+              delete poem._id;
+              delete poem.__v;
+              delete poem.creator;
+
+              resObj.poem         = poem;
+              res.status(200).send(resObj);
             }
-          );
+          });
         }
       });
     }
