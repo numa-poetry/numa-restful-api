@@ -971,7 +971,7 @@ module.exports = function(app) {
             } else {
               var resObj          = {};
               var creator         = {};
-              creator.id          = user._id;
+              creator.id          = hashids.encryptHex(user._id);
               creator.displayName = user.displayName || user.local.displayName;
               resObj.creator      = creator;
               poem                = poem.toObject();
