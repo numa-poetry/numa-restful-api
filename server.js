@@ -16,12 +16,13 @@ try {
   var PrettyError  = require('pretty-error');
   var cool         = require('cool-ascii-faces');
   var superb       = require('superb');
-  var db           = require('./config/db.js');
   var auth         = require('./config/auth.js');
   var app          = express();
 
+  var port         = process.env.PORT || 3000;
+
 // db config -------------------------------------------------------------------
-  mongoose.connect(db.MONGO_CONNECTION_URI);
+  mongoose.connect(auth.CONNECTION_URI);
 
   mongoose.connection.on('error', function() {
     message = '✗ MongoDB Connection Error. Please make sure MongoDB is running and restart the server.';
@@ -29,7 +30,7 @@ try {
   });
 
 // global config ---------------------------------------------------------------
-  app.set('port', process.env.PORT || 3000);
+  app.set('port', port);
   app.use(logger({
     path: './logfile.txt'
   }));
@@ -42,16 +43,21 @@ try {
 
 // env config ------------------------------------------------------------------
   if (app.get('env') === 'development') {
+    message = 'Running in development mode';
+    console.log(message.yellow);
     app.use(errorhandler());
     // mongoose.set('debug', true);
   }
 
-  // Force HTTPS
   if (app.get('env') === 'production') {
-    app.use(function(req, res, next) {
-      var protocol = req.get('x-forwarded-proto');
-      protocol == 'https' ? next() : res.redirect('https://' + req.hostname + req.url);
-    });
+    message = 'Running in production mode';
+    console.log(message.yellow);
+
+    // Force HTTPS
+    // app.use(function(req, res, next) {
+    //   var protocol = req.get('x-forwarded-proto');
+    //   protocol == 'https' ? next() : res.redirect('https://' + req.hostname + req.url);
+    // });
     app.use(errorhandler({
       dumpExceptions : true,
       showStack      : true
@@ -78,9 +84,9 @@ try {
   pe.skipPackage('express'); // this will skip all the trace lines about express' core and sub-modules
 
 // run server ------------------------------------------------------------------
-  app.listen(app.get('port'), function() {
+  app.listen(port, function() {
     message = '\n' + superb() + '! ' + cool().yellow + '\nThe express server is now ' +
-      'listening on port ' + app.get('port') + '.';
+      'listening on port ' + port + '.';
     console.log(message.bold.blue);
   });
 }

@@ -17,7 +17,7 @@ var s3            = require('s3');
 var fs            = require('fs');
 var User          = require('./models/user.js');
 var Poem          = require('./models/poem.js');
-var auth          = require('./config/auth');
+var auth          = require('./config/auth.js');
 
 var hashids = new Hashids(auth.HASHIDS_SALT);
 

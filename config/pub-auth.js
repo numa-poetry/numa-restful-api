@@ -24,6 +24,7 @@ module.exports = {
   'TOKEN_SECRET'        : 'XXX',
   'ENCRYPTION_KEY'      : 'XXX',
   'ENCRYPTION_ALGO'     : 'aes128',
-  'HASHIDS_SALT'        : 'XXX'
+  'HASHIDS_SALT'        : 'XXX',
+  'CONNECTION_URI'      : 'XXX'
 
 };
