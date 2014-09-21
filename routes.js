@@ -76,8 +76,10 @@ module.exports = function(app) {
       });
     } else {
 
+      var userId = req.params.id || req.params.userId;
+
       // Verify user exists
-      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findById(hashids.decryptHex(userId), function(err, user) {
         if (err) {
           res.message = 'The user is not authorized to access this resource.';
           return next(err);
@@ -95,7 +97,7 @@ module.exports = function(app) {
             var payload = jwt.decode(token, auth.TOKEN_SECRET);
 
             // Verify user is token subject
-            if (payload.sub !== req.params.id) {
+            if (payload.sub !== userId) {
               errMsg = 'The user is not the token subject.';
               console.log(errMsg.red);
               res.status(401).send({
@@ -838,8 +840,9 @@ module.exports = function(app) {
       console.log('Request body:'.green, req.body);
 
       // req.user retrieved from ensureAuthenticated() middleware
-      // res.status(200).send({ message : 'TEST' });
-      User.findById(req.user._id, function(err, user) {
+      User.findByIdAndUpdate(req.user._id, {
+        'email' : req.body.email || user.email
+      }, function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
@@ -851,24 +854,11 @@ module.exports = function(app) {
             message : errMsg
           });
         } else {
-          user.email = req.body.email || user.email;
-          user.save(function(err) {
-            if (err) {
-              res.message = 'The user could not be saved to the database.';
-              return next(err);
-            } else {
-              var sucMsg = 'The user was updated.';
-              var resObj = {};
-              resObj.user = user;
-              resObj.type = 'success';
-              resObj.message = sucMsg;
-              console.log(sucMsg.blue);
-              res.status(200).send(
-                // type    : 'success',
-                // message : sucMsg
-                resObj
-              );
-            }
+          var sucMsg = 'The user was updated.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
           });
         }
       });
@@ -982,6 +972,38 @@ module.exports = function(app) {
               resObj.poem         = poem;
               res.status(200).send(resObj);
             }
+          });
+        }
+      });
+    }
+  );
+
+  app.put('/api/v1/user/:userId/poem/:poemId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[PUT] /api/v1/user/:userId/poem/:poemId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
+        'title' : req.body.title,
+        'poem'  : req.body.poem
+      }, function(err, poem) {
+        if (err) {
+          res.message = 'The poem could not be found.';
+          return next(err);
+        } else if (!poem) {
+          var errMsg = 'The poem could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          var sucMsg = 'The poem was updated.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
           });
         }
       });
