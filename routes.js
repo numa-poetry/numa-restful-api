@@ -913,16 +913,44 @@ module.exports = function(app) {
         if (err) {
           res.message = 'Could not retrieve all users.';
           return next(err);
-        }
-        if (!users) {
+        } else if (!users) {
           errMsg = 'All users could not be found';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
             message : errMsg
           });
+        } else {
+          res.status(200).send(users);
         }
-        res.status(200).send(users);
+      });
+    }
+  );
+
+  /**
+   * Get all poems
+   */
+  app.get('/api/v1/poem',
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/poem'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg;
+
+      Poem.find(function(err, poems) {
+        if (err) {
+          res.message = 'Could not retrieve all poems.';
+          return next(err);
+        } else if (!poems) {
+          errMsg = 'All poems could not be found';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          res.status(200).send(poems);
+        }
       });
     }
   );
@@ -951,7 +979,7 @@ module.exports = function(app) {
           // find creator details
           User.findById(poem.creator, function(err, user) {
             if (err || !user) {
-              // maybe send a blank instead of error
+              // User could be deleted, handle gracefully
               var errMsg = 'The user could not be found.';
               console.log(errMsg.red);
               res.status(404).send({
@@ -978,6 +1006,9 @@ module.exports = function(app) {
     }
   );
 
+  /**
+   * Update a poem
+   */
   app.put('/api/v1/user/:userId/poem/:poemId',
     ensureAuthenticated,
     function(req, res, next) {
