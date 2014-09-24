@@ -25,6 +25,6 @@ module.exports = {
   'ENCRYPTION_KEY'      : 'XXX',
   'ENCRYPTION_ALGO'     : 'aes128',
   'HASHIDS_SALT'        : 'XXX',
-  'CONNECTION_URI'      : 'XXX'
+  'CONNECTION_URI'      : 'mongodb://localhost/numa'
 
 };

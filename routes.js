@@ -949,7 +949,37 @@ module.exports = function(app) {
             message : errMsg
           });
         } else {
-          res.status(200).send(poems);
+
+          // for each poem, get the creator's _id and displayName
+          var resObj = [];
+          async.each(poems,
+            function(poem, callback) {
+              User.findById(poem.creator, function(err, user) {
+                if (user) {
+                  var creator         = {};
+                  creator.id          = hashids.encryptHex(user._id);
+                  creator.displayName = user.displayName || user.local.displayName;
+
+                  var poemObj         = {};
+                  poemObj.id          = hashids.encryptHex(poem._id);
+                  poemObj.title       = poem.title;
+                  poemObj.poem        = poem.poem;
+                  poemObj.creator     = creator;
+                  poemObj.upvotes     = poem.upvotes;
+                  poemObj.downvotes   = poem.downvotes;
+
+                  // need to get each poem's tags
+
+                  resObj.push(poemObj);
+                  callback();
+                }
+              });
+            },
+            function(err) {
+              console.log(resObj);
+              res.status(200).send(resObj);
+            }
+          );
         }
       });
     }
