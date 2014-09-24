@@ -959,24 +959,17 @@ module.exports = function(app) {
                   var creator         = {};
                   creator.id          = hashids.encryptHex(user._id);
                   creator.displayName = user.displayName || user.local.displayName;
-
-                  var poemObj         = {};
-                  poemObj.id          = hashids.encryptHex(poem._id);
-                  poemObj.title       = poem.title;
-                  poemObj.poem        = poem.poem;
-                  poemObj.creator     = creator;
-                  poemObj.upvotes     = poem.upvotes;
-                  poemObj.downvotes   = poem.downvotes;
-
-                  // need to get each poem's tags
-
-                  resObj.push(poemObj);
+                  poem                = poem.toObject();
+                  poem.id             = hashids.encryptHex(poem._id);
+                  delete poem._id;
+                  delete poem.__v;
+                  resObj.push(poem);
                   callback();
                 }
               });
             },
             function(err) {
-              console.log(resObj);
+              // console.log(resObj);
               res.status(200).send(resObj);
             }
           );
@@ -1026,7 +1019,6 @@ module.exports = function(app) {
               delete poem._id;
               delete poem.__v;
               delete poem.creator;
-
               resObj.poem         = poem;
               res.status(200).send(resObj);
             }
@@ -1118,7 +1110,8 @@ module.exports = function(app) {
       var newPoem = new Poem({
         creator : req.user._id,
         title   : req.body.title,
-        poem    : req.body.poem
+        poem    : req.body.poem,
+        tags    : req.body.tags
       });
 
       newPoem.save(function(err, poem) {

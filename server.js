@@ -89,10 +89,7 @@ try {
       'listening on port ' + port + '.';
     console.log(message.bold.blue);
   });
-}
-
-// https://stackoverflow.com/questions/12890494/improving-express-js-module-usage
-catch (exception) {
+} catch (exception) {
   var message = 'Server exception: ' + exception;
   console.log(message.bold.red);
 }
