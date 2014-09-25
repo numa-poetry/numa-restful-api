@@ -773,19 +773,21 @@ module.exports = function(app) {
    * Get a user
    * Request body:
    *   If req.body.type === 'Basic', send minimal user info
-   *   If req.body.type === 'Full', send minimal info + poem titles + user comments
+   *   If req.body.type === 'Full', send minimal info + poem titles + comments
    */
   app.post('/api/v1/user/:id',
     function(req, res, next) {
       console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
+      var errMsg;
+
       User.findById(hashids.decryptHex(req.params.id), function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
         } else if (!user) {
-          var errMsg = 'The user could not be found.';
+          errMsg = 'The user could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
@@ -802,28 +804,59 @@ module.exports = function(app) {
           if (req.body.type === 'Full') {
             // gather user poem titles and user comments
             var poems = [];
-            async.each(user.poems,
-              function(id, callback) {
-                Poem.findById(id, function(err, poem) {
-                  if (poem) {
-                    var poemObj = {};
-                    poemObj.id        = hashids.encryptHex(poem._id),
-                    poemObj.title     = poem.title;
-                    poemObj.poem      = poem.poem;
-                    poemObj.createdAt = poem.createdAt;
-                    poems.push(poemObj);
-                    callback();
+
+            async.waterfall([
+              function(done) {
+                async.each(user.poems,
+                  function(id, callback) {
+                    Poem.findById(id, function(err, poem) {
+                      if (poem) {
+                        var poemObj = {};
+                        poemObj.id        = hashids.encryptHex(poem._id),
+                        poemObj.title     = poem.title;
+                        poemObj.poem      = poem.poem;
+                        poemObj.createdAt = poem.createdAt;
+                        poems.push(poemObj);
+                        callback();
+                      }
+                    });
+                  },
+                  function(err) {
+                    resObj.poems = poems;
+                    done(null, resObj);
                   }
-                });
+                );
               },
-              function(err) {
-                resObj.poems = poems;
-                console.log(resObj);
+              function(resObj, done) {
+                var comments = [];
+                async.each(user.comments,
+                  function(id, callback) {
+                    Comment.findById(id, function(err, comment) {
+                      if (comment) {
+                        var commentObj       = {};
+                        commentObj.id        = hashids.encryptHex(comment._id),
+                        commentObj.comment   = comment.comment;
+                        commentObj.createdAt = comment.createdAt;
+                        comments.push(commentObj);
+                        callback();
+                      }
+                    });
+                  },
+                  function(err) {
+                    resObj.comments = comments;
+                    done(null, resObj);
+                  }
+                );
+              }
+            ], function(err, resObj) {
+              if (err) {
+                res.message = 'Could not get user details.';
+                return next(err);
+              } else {
                 res.status(200).send(resObj);
               }
-            );
+            });
           } else {
-            console.log(resObj);
             res.status(200).send(resObj);
           }
         }
@@ -957,12 +990,13 @@ module.exports = function(app) {
             function(poem, callback) {
               User.findById(poem.creator, function(err, user) {
                 if (user) {
-                  var creator         = {};
-                  creator.id          = hashids.encryptHex(user._id);
-                  creator.displayName = user.displayName || user.local.displayName;
-                  poem                = poem.toObject();
-                  poem.id             = hashids.encryptHex(poem._id);
-                  poem.creator        = creator;
+                  var creator           = {};
+                  creator.id            = hashids.encryptHex(user._id);
+                  creator.displayName   = user.displayName || user.local.displayName;
+                  poem                  = poem.toObject();
+                  poem.id               = hashids.encryptHex(poem._id);
+                  poem.creator          = creator;
+                  poem.numberOfComments = poem.comments.length;
                   delete poem._id;
                   delete poem.__v;
                   resObj.push(poem);
