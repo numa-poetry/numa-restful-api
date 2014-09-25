@@ -961,6 +961,7 @@ module.exports = function(app) {
                   creator.displayName = user.displayName || user.local.displayName;
                   poem                = poem.toObject();
                   poem.id             = hashids.encryptHex(poem._id);
+                  poem.creator        = creator;
                   delete poem._id;
                   delete poem.__v;
                   resObj.push(poem);
@@ -1039,7 +1040,8 @@ module.exports = function(app) {
 
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
         'title' : req.body.title,
-        'poem'  : req.body.poem
+        'poem'  : req.body.poem,
+        'tags'  : req.body.tags
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
