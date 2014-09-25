@@ -17,6 +17,7 @@ var s3            = require('s3');
 var fs            = require('fs');
 var User          = require('./models/user.js');
 var Poem          = require('./models/poem.js');
+var Comment       = require('./models/comment.js');
 var auth          = require('./config/auth.js');
 
 var hashids = new Hashids(auth.HASHIDS_SALT);
@@ -987,12 +988,15 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/poem/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      Poem.findById(hashids.decryptHex(req.params.id), function(err, poem) {
+      var poemId = hashids.decryptHex(req.params.id);
+      var errMsg;
+
+      Poem.findById(poemId, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
           return next(err);
         } else if (!poem) {
-          var errMsg = 'The poem could not be found.';
+          errMsg = 'The poem could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
@@ -1004,24 +1008,55 @@ module.exports = function(app) {
           User.findById(poem.creator, function(err, user) {
             if (err || !user) {
               // User could be deleted, handle gracefully
-              var errMsg = 'The user could not be found.';
+              errMsg = 'The user could not be found.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
                 message : errMsg
               });
             } else {
-              var resObj          = {};
-              var creator         = {};
-              creator.id          = hashids.encryptHex(user._id);
-              creator.displayName = user.displayName || user.local.displayName;
-              resObj.creator      = creator;
-              poem                = poem.toObject();
-              delete poem._id;
-              delete poem.__v;
-              delete poem.creator;
-              resObj.poem         = poem;
-              res.status(200).send(resObj);
+
+              // gather poem comments
+              var resObj   = {};
+              var comments = [];
+              async.each(poem.comments,
+                function(id, callback) {
+                  Comment.findById(id, function(err, comment) {
+                    if (comment) {
+                      var commentObj       = {};
+                      commentObj.id        = hashids.encryptHex(comment._id),
+                      commentObj.comment   = comment.comment;
+                      commentObj.createdAt = comment.createdAt;
+
+                      User.findById(comment.creator, function(err, user) {
+                        if (err) {
+                          errMsg = 'A comment creator could not be found...';
+                          console.log(errMsg.red);
+                        } else {
+                          commentObj.creator = user.displayName || user.local.displayName;
+                          comments.push(commentObj);
+                          callback();
+                        }
+                      });
+                    }
+                  });
+                },
+                function(err) {
+                  var creator         = {};
+                  creator.id          = hashids.encryptHex(user._id);
+                  creator.displayName = user.displayName || user.local.displayName;
+
+                  poem                = poem.toObject();
+                  delete poem._id;
+                  delete poem.__v;
+                  delete poem.creator;
+
+                  resObj.creator      = creator;
+                  resObj.poem         = poem;
+                  resObj.comments     = comments;
+                  res.status(200).send(resObj);
+                }
+              );
             }
           });
         }
@@ -1099,7 +1134,82 @@ module.exports = function(app) {
   // );
 
   /**
-   * Save a new poem to the database
+   * Save a new comment
+   */
+  app.post('/api/v1/user/:userId/poem/:poemId/comment',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:userId/poem/:poemId/comment'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var sucMsg;
+      var poemId = hashids.decryptHex(req.params.poemId);
+
+      var newComment = new Comment({
+        creator : req.user._id,
+        poem    : poemId,
+        comment : req.body.comment
+      });
+
+      newComment.save(function(err, comment) {
+        if (err) {
+          res.message = 'Could not save the comment.';
+          return next(err);
+        } else {
+          console.log(comment._id);
+
+          // Add ref to user
+          User.findByIdAndUpdate(req.user._id, {
+            '$addToSet': {
+              comments: comment._id
+            }
+          }, function(err, user) {
+            if (err) {
+              res.message = 'The user could not be found and updated.';
+              return next(err);
+            } else if (!user) {
+              var errMsg = 'The user could not be found and updated.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+
+              // Add ref to poem
+              Poem.findByIdAndUpdate(poemId, {
+                '$addToSet': {
+                  comments: comment._id
+                }
+              }, function(err, poem) {
+                if (err) {
+                  res.message = 'The poem could not be found and updated.';
+                  return next(err);
+                } else if (!poem) {
+                  var errMsg = 'The poem could not be found and updated.';
+                  console.log(errMsg.red);
+                  res.status(404).send({
+                    type    : 'not_found',
+                    message : errMsg
+                  });
+                } else {
+                  var sucMsg = 'The comment was saved.';
+                  console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type    : 'success',
+                    message : sucMsg
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  );
+
+  /**
+   * Save a new poem
    */
   app.post('/api/v1/user/:id/poem',
     ensureAuthenticated,
