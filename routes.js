@@ -971,7 +971,6 @@ module.exports = function(app) {
               });
             },
             function(err) {
-              // console.log(resObj);
               res.status(200).send(resObj);
             }
           );
@@ -988,25 +987,27 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/poem/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
+      var errMsg, sucMsg;
       var poemId = hashids.decryptHex(req.params.id);
-      var errMsg;
 
-      Poem.findById(poemId, function(err, poem) {
-        if (err) {
-          res.message = 'The poem could not be found.';
-          return next(err);
-        } else if (!poem) {
-          errMsg = 'The poem could not be found.';
-          console.log(errMsg.red);
-          res.status(404).send({
-            type    : 'not_found',
-            message : errMsg
+      async.waterfall([
+        function(done) {
+          Poem.findById(poemId, function(err, poem) {
+            if (!poem) {
+              errMsg = 'The poem could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              done(null, poem);
+            }
           });
-        } else {
-
-          // find creator details
+        },
+        function(poem, done) {
           User.findById(poem.creator, function(err, user) {
-            if (err || !user) {
+            if (!user) {
               // User could be deleted, handle gracefully
               errMsg = 'The user could not be found.';
               console.log(errMsg.red);
@@ -1015,50 +1016,61 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
-
-              // gather poem comments
-              var resObj   = {};
-              var comments = [];
-              async.each(poem.comments,
-                function(id, callback) {
-                  Comment.findById(id, function(err, comment) {
-                    if (comment) {
-                      var commentObj       = {};
-                      commentObj.id        = hashids.encryptHex(comment._id),
-                      commentObj.comment   = comment.comment;
-                      commentObj.createdAt = comment.createdAt;
-
-                      User.findById(comment.creator, function(err, user) {
-                        if (err) {
-                          errMsg = 'A comment creator could not be found...';
-                          console.log(errMsg.red);
-                        } else {
-                          commentObj.creator = user.displayName || user.local.displayName;
-                          comments.push(commentObj);
-                          callback();
-                        }
-                      });
-                    }
-                  });
-                },
-                function(err) {
-                  var creator         = {};
-                  creator.id          = hashids.encryptHex(user._id);
-                  creator.displayName = user.displayName || user.local.displayName;
-
-                  poem                = poem.toObject();
-                  delete poem._id;
-                  delete poem.__v;
-                  delete poem.creator;
-
-                  resObj.creator      = creator;
-                  resObj.poem         = poem;
-                  resObj.comments     = comments;
-                  res.status(200).send(resObj);
-                }
-              );
+              done(null, user, poem);
             }
           });
+        },
+        function(user, poem, done) {
+          // gather poem comments
+          var resObj   = {};
+          var comments = [];
+          async.each(poem.comments,
+            function(id, callback) {
+              Comment.findById(id, function(err, comment) {
+                if (comment) {
+                  var commentObj       = {};
+                  commentObj.id        = hashids.encryptHex(comment._id),
+                  commentObj.comment   = comment.comment;
+                  commentObj.createdAt = comment.createdAt;
+
+                  User.findById(comment.creator, function(err, user) {
+                    if (err) {
+                      errMsg = 'A comment creator could not be found...';
+                      console.log(errMsg.red);
+                    } else {
+                      commentObj.creator = user.displayName || user.local.displayName;
+                      comments.push(commentObj);
+                      callback();
+                    }
+                  });
+                }
+              });
+            },
+            function(err) {
+              var creator         = {};
+              creator.id          = hashids.encryptHex(user._id);
+              creator.displayName = user.displayName || user.local.displayName;
+
+              poem                = poem.toObject();
+              delete poem._id;
+              delete poem.__v;
+              delete poem.creator;
+              delete poem.comments;
+
+              resObj.poem          = poem;
+              resObj.poem.creator  = creator;
+              resObj.poem.comments = comments;
+              done(null, resObj);
+            }
+          );
+        }
+      ], function(err, resObj) {
+        if (err) {
+          res.message = 'Could not save the poem.';
+          return next(err);
+        } else {
+          console.log(resObj);
+          res.status(200).send(resObj);
         }
       });
     }
@@ -1142,7 +1154,7 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/user/:userId/poem/:poemId/comment'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      var sucMsg;
+      var errMsg, sucMsg;
       var poemId = hashids.decryptHex(req.params.poemId);
 
       var newComment = new Comment({
@@ -1151,57 +1163,61 @@ module.exports = function(app) {
         comment : req.body.comment
       });
 
-      newComment.save(function(err, comment) {
-        if (err) {
-          res.message = 'Could not save the comment.';
-          return next(err);
-        } else {
-          console.log(comment._id);
-
+      async.waterfall([
+        function(done) {
+          // Save comment
+          newComment.save(function(err, comment) {
+            done(null, comment._id);
+          });
+        },
+        function(commentId, done) {
           // Add ref to user
           User.findByIdAndUpdate(req.user._id, {
             '$addToSet': {
-              comments: comment._id
+              comments: commentId
             }
           }, function(err, user) {
-            if (err) {
-              res.message = 'The user could not be found and updated.';
-              return next(err);
-            } else if (!user) {
-              var errMsg = 'The user could not be found and updated.';
+            if (!user) {
+              errMsg = 'The user could not be found and updated.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
                 message : errMsg
               });
             } else {
-
-              // Add ref to poem
-              Poem.findByIdAndUpdate(poemId, {
-                '$addToSet': {
-                  comments: comment._id
-                }
-              }, function(err, poem) {
-                if (err) {
-                  res.message = 'The poem could not be found and updated.';
-                  return next(err);
-                } else if (!poem) {
-                  var errMsg = 'The poem could not be found and updated.';
-                  console.log(errMsg.red);
-                  res.status(404).send({
-                    type    : 'not_found',
-                    message : errMsg
-                  });
-                } else {
-                  var sucMsg = 'The comment was saved.';
-                  console.log(sucMsg.blue);
-                  res.status(200).send({
-                    type    : 'success',
-                    message : sucMsg
-                  });
-                }
-              });
+              done(null, commentId);
             }
+          });
+        },
+        function(commentId, done) {
+          // Add ref to poem
+          Poem.findByIdAndUpdate(poemId, {
+            '$addToSet': {
+              comments: commentId
+            }
+          }, function(err, poem) {
+              if (!poem) {
+                errMsg = 'The poem could not be found and updated.';
+                console.log(errMsg.red);
+                res.status(404).send({
+                  type    : 'not_found',
+                  message : errMsg
+                });
+              } else {
+                done(null);
+              }
+          });
+        }
+      ], function(err) {
+        if (err) {
+          res.message = 'Could not save the comment.';
+          return next(err);
+        } else {
+          sucMsg = 'The comment was saved.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
           });
         }
       });
@@ -1231,32 +1247,29 @@ module.exports = function(app) {
           res.message = 'Could not save new poem.';
           return next(err);
         } else {
-          User.findById(req.user._id, function(err, user) {
+
+          // Add ref to creator
+          User.findByIdAndUpdate(req.user._id, {
+            '$addToSet': {
+              poems: poem._id
+            }
+          }, function(err, user) {
             if (err) {
-              res.message = 'The user could not be found.';
+              res.message = 'The user could not be found and updated.';
               return next(err);
             } else if (!user) {
-              var errMsg = 'The user could not be found.';
+              var errMsg = 'The user could not be found and updated.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
                 message : errMsg
               });
             } else {
-              user.poems.addToSet(poem._id); // add poem ref to creator
-
-              user.save(function(err) {
-                if (err) {
-                  res.message = 'Could not save poem ref to user.';
-                  return next(err);
-                } else {
-                  var sucMsg = 'The poem was saved.';
-                  console.log(sucMsg.blue);
-                  res.status(200).send({
-                    type    : 'success',
-                    message : sucMsg
-                  });
-                }
+              var sucMsg = 'The poem was saved.';
+              console.log(sucMsg.blue);
+              res.status(200).send({
+                type    : 'success',
+                message : sucMsg
               });
             }
           });
@@ -1444,7 +1457,7 @@ module.exports = function(app) {
               res.message = 'The user could not be found.';
               return next(err);
             } else if (!user) {
-              var errMsg = 'The user could not be found.';
+              errMsg = 'The user could not be found.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
@@ -1466,7 +1479,7 @@ module.exports = function(app) {
       ], function(err, avatarUrl) {
           console.log('Image found at:', avatarUrl);
           res.status(200).send({
-            type            : 'success',
+            type      : 'success',
             avatarUrl : avatarUrl
           });
       });
