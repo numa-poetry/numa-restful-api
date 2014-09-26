@@ -777,7 +777,7 @@ module.exports = function(app) {
    */
   app.post('/api/v1/user/:id',
     function(req, res, next) {
-      console.log('\n[GET] /api/v1/user/:id'.bold.green);
+      console.log('\n[POST] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var errMsg;
@@ -1180,12 +1180,88 @@ module.exports = function(app) {
   // );
 
   /**
+   * Vote for a poem
+   */
+  app.post('/api/v1/user/:userId/poem/:poemId/vote',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:userId/poem/:poemId/vote'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var poemId = hashids.decryptHex(req.params.poemId);
+      var userId = req.user._id;
+      var sucMsg;
+
+      Poem.findById(poemId, function(err, poem) {
+        if (err) {
+          res.message = 'The poem could not be found.';
+          return next(err);
+        } else if (!poem) {
+          var errMsg = 'The poem could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+
+          async.series([
+            function(callback) {
+              // Upvote
+              if (req.body.vote === 'up') {
+                poem.upvote(userId, function(err, doc) {
+                  callback();
+                });
+              }
+
+              // Downvote
+              else if (req.body.vote === 'down') {
+                poem.downvote(userId, function(err, doc) {
+                  callback();
+                });
+              }
+
+              // Remove vote
+              else if (req.body.vote === 'None') {
+                if (poem.upvoted(userId)) {
+                  Poem.findByIdAndUpdate(poemId, {
+                    '$pull': {
+                      'vote.positive': userId
+                    }
+                  }, function(err, poem) {
+                    callback();
+                  });
+                } else if (poem.downvoted(userId)) {
+                  Poem.findByIdAndUpdate(poemId, {
+                    '$pull': {
+                      'vote.negative': userId
+                    }
+                  }, function(err, poem) {
+                    callback();
+                  });
+                }
+              }
+            }
+          ], function(err) {
+            sucMsg = 'Successful vote.';
+            console.log(sucMsg.blue);
+            res.status(200).send({
+              type    : 'success',
+              message : sucMsg
+            });
+          });
+        }
+      });
+    }
+  );
+
+  /**
    * Save a new comment
    */
   app.post('/api/v1/user/:userId/poem/:poemId/comment',
     ensureAuthenticated,
     function(req, res, next) {
-      console.log('\n[GET] /api/v1/user/:userId/poem/:poemId/comment'.bold.green);
+      console.log('\n[POST] /api/v1/user/:userId/poem/:poemId/comment'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
@@ -1264,7 +1340,7 @@ module.exports = function(app) {
   app.post('/api/v1/user/:id/poem',
     ensureAuthenticated,
     function(req, res, next) {
-      console.log('\n[GET] /api/v1/user/:id/poem'.bold.green);
+      console.log('\n[POST] /api/v1/user/:id/poem'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var sucMsg;

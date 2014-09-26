@@ -2,6 +2,7 @@
 
 var mongoose   = require('mongoose');
 var timestamps = require('mongoose-timestamp');
+var voting     = require('mongoose-voting');
 var User       = require('./user.js');
 var Comment    = require('./comment.js');
 var Schema     = mongoose.Schema;
@@ -13,12 +14,11 @@ var poemSchema = new Schema({
   poem        : { type: String },
   tags        : [{ type: String, trim: true }],
   comments    : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
-  upvotes     : { type: Number },
-  downvotes   : { type: Number },
   inspiration : { type: String }
 });
 
 // plugins ---------------------------------------------------------------------
 poemSchema.plugin(timestamps);
+poemSchema.plugin(voting);
 
 module.exports = mongoose.model('Poem', poemSchema);

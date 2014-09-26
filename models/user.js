@@ -12,8 +12,6 @@ var LOCK_TIME          = 60 * 60 * 1000; // 1 hour lock (ms)
 
 // schema ----------------------------------------------------------------------
 var userSchema = new Schema({
-
-  // oauth ids
   github               : { type: String },
   google               : { type: String },
   facebook             : { type: String },
@@ -33,7 +31,6 @@ var userSchema = new Schema({
 
   poems                : [{ type: Schema.Types.ObjectId, ref: 'Poem' }],
   comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }]
-
 });
 
 userSchema.virtual('isLocked').get(function() {
