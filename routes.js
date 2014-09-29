@@ -44,22 +44,22 @@ module.exports = function(app) {
     return decryptedText;
   }
 
-  function createToken(stayLoggedIn, user) {
+  function createToken(stayLoggedIn, user, req) {
     var expires, payload;
 
     if (stayLoggedIn) {
       expires = moment().add(14, 'days').valueOf();
       console.log('long session token set'.yellow);
     } else {
-      expires = moment().add(1, 'hour').valueOf();
+      expires = moment().add(1, 'day').valueOf();
       console.log('short session token set'.yellow);
     }
     payload = {
       user  : user,
       'sub' : hashids.encryptHex(user._id), // subject (identifies the principal that is the subject of the JWT)
-      // 'iss' : req.hostname, // issuer (specifies entity making the request)
-      'iat' : moment().valueOf(), // The iat (issued at) claim identifies the time at which the JWT was issued.
-      'exp' : expires // expires (lifetime of token)
+      'iss' : req.hostname,                 // issuer (specifies entity making the request)
+      'iat' : moment().valueOf(),           // The iat (issued at) claim identifies the time at which the JWT was issued.
+      'exp' : expires                       // expires (lifetime of token)
     };
     return jwt.encode(payload, auth.TOKEN_SECRET);
   }
@@ -185,7 +185,7 @@ module.exports = function(app) {
             } else {
               newUser = newUser.toObject();
               delete newUser.password;
-              var token = createToken(req.body.stayLoggedIn, newUser);
+              var token = createToken(req.body.stayLoggedIn, newUser, req);
               res.status(201).send({
                 id    : hashids.encryptHex(newUser._id),
                 token : token
@@ -217,10 +217,7 @@ module.exports = function(app) {
             console.log('login successful'.green);
             user = user.toObject();
             delete user.password;
-            var token = createToken(req.body.stayLoggedIn, user);
-
-            console.log(hashids.encryptHex(user._id));
-
+            var token = createToken(req.body.stayLoggedIn, user, req);
             res.status(201).send({
               id    : hashids.encryptHex(user._id),
               token : token
@@ -510,7 +507,7 @@ module.exports = function(app) {
                         res.message = 'The user could not be saved to the database.';
                         return next(err);
                       } else {
-                        var token = createToken(undefined /* stayLoggedIn */, user);
+                        var token = createToken(true, user, req);
                         res.status(200).send({
                           id          : hashids.encryptHex(user._id),
                           token       : token,
@@ -529,7 +526,7 @@ module.exports = function(app) {
             User.findOne({ 'facebook': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
-                var token = createToken(undefined /* stayLoggedIn */, existingUser);
+                var token = createToken(true, existingUser, req);
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -547,7 +544,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* stayLoggedIn */, newUser);
+                    var token = createToken(true, newUser, req);
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -610,7 +607,7 @@ module.exports = function(app) {
                         res.message = 'The user could not be saved to the database.';
                         return next(err);
                       } else {
-                        var token = createToken(undefined /* stayLoggedIn */, user);
+                        var token = createToken(true, user, req);
                         res.status(200).send({
                           id          : hashids.encryptHex(user._id),
                           token       : token,
@@ -629,7 +626,7 @@ module.exports = function(app) {
             User.findOne({ 'github': profile.id }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existing user');
-                var token = createToken(undefined /* stayLoggedIn */, existingUser);
+                var token = createToken(true, existingUser, req);
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -647,7 +644,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* stayLoggedIn */, newUser);
+                    var token = createToken(true, newUser, req);
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -711,7 +708,7 @@ module.exports = function(app) {
                       res.message = 'The user could not be saved to the database.';
                       return next(err);
                     } else {
-                      var token = createToken(undefined /* stayLoggedIn */, user);
+                      var token = createToken(true, user, req);
                       res.status(200).send({
                         id          : hashids.encryptHex(user._id),
                         token       : token,
@@ -729,7 +726,7 @@ module.exports = function(app) {
             User.findOne({ 'google': profile.sub }, function(err, existingUser) {
               if (existingUser) {
                 console.log('3b existingUser');
-                var token = createToken(undefined /* stayLoggedIn */, existingUser);
+                var token = createToken(true, existingUser, req);
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -754,7 +751,7 @@ module.exports = function(app) {
                     res.message = 'The user could not be saved to the database.';
                     return next(err);
                   } else {
-                    var token = createToken(undefined /* stayLoggedIn */, newUser);
+                    var token = createToken(true, newUser, req);
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -1219,58 +1216,56 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
+              console.log(poem.vote);
+              console.log(userId);
               // check if any votes
-              if (poem.vote.positive.length === 0 || poem.vote.negative.length === 0) {
+              if (poem.vote.positive.length === 0 && poem.vote.negative.length === 0) {
                 res.status(200).send({
                   type : 'success',
                   vote : 'None'
                 });
-              }
-
-              var vote, i;
-              async.waterfall([
-                function(callback) {
-                  // check if user voted positive
-                  for (i = poem.vote.positive.length - 1; i >= 0; --i) {
-                    if (poem.vote.positive[i] + '' === userId) {
+              } else {
+                var vote, i;
+                async.waterfall([
+                  function(callback) {
+                    // check if user voted positive
+                    if (poem.vote.positive.indexOf(userId) != -1) {
                       vote = 'up';
                       callback(null, vote);
+                    } else {
+                      callback(null, vote);
                     }
-                    if (i === 0 && vote != 'up') {
+                  },
+                  function(vote, callback) {
+                    if (vote == 'up') {
+                      callback(null, vote);
+                    }
+                    // check if user voted negative
+                    else if (poem.vote.negative.indexOf(userId) != -1) {
+                      vote = 'down';
+                      callback(null, vote);
+                    } else {
+                      callback(null, vote);
+                    }
+                  },
+                  function(vote, callback) {
+                    // check if user has not voted
+                    if (vote != 'up' && vote != 'down') {
+                      vote = 'None';
+                      callback(null, vote);
+                    } else {
                       callback(null, vote);
                     }
                   }
-                },
-                function(vote, callback) {
-                  if (vote == 'up') {
-                    callback(null, vote);
-                  } else {
-
-                    // check if user voted negative
-                    for (i = poem.vote.negative.length - 1; i >= 0; --i) {
-                      if (poem.vote.negative[i] + '' === userId) {
-                        vote = 'down';
-                        callback(null, vote);
-                      }
-                    }
-                  }
-                },
-                function(vote, callback) {
-                  if (vote != 'up' && vote != 'down') {
-                    vote = 'None';
-                    callback(null, vote);
-                  } else {
-                    callback(null, vote);
-                  }
-                }
-              ], function(err, vote) {
-                sucMsg = 'Vote: ' + vote;
-                console.log(sucMsg.blue);
-                  res.status(200).send({
-                    type : 'success',
-                    vote : vote
-                  });
-              });
+                ], function(err, vote) {
+                  sucMsg = 'Vote: ' + vote;
+                  console.log(sucMsg.blue);
+                    res.status(200).send({
+                      type : 'success',
+                      vote : vote
+                    });
+                });
+              }
             }
           });
         }
