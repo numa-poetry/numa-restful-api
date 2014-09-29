@@ -1084,12 +1084,15 @@ module.exports = function(app) {
               var creator         = {};
               creator.id          = hashids.encryptHex(user._id);
               creator.displayName = user.displayName || user.local.displayName;
-
               poem                = poem.toObject();
+              poem.positiveVotes  = poem.vote.positive.length;
+              poem.negativeVotes  = poem.vote.negative.length;
+
               delete poem._id;
               delete poem.__v;
               delete poem.creator;
               delete poem.comments;
+              delete poem.vote;
 
               resObj.poem          = poem;
               resObj.poem.creator  = creator;
@@ -1178,6 +1181,102 @@ module.exports = function(app) {
   //     });
   //   }
   // );
+
+  /**
+   * Get user's vote for a poem
+   */
+  app.get('/api/v1/user/:userId/poem/:poemId/vote',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/poem/:poemId/user/:userId/vote'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var poemId = hashids.decryptHex(req.params.poemId);
+      var userId = req.user._id + ''; // for str compare in async.series below
+      var sucMsg;
+
+      Poem.findById(poemId, function(err, poem) {
+        if (err) {
+          res.message = 'The poem could not be found.';
+          return next(err);
+        } else if (!poem) {
+          var errMsg = 'The poem could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          User.findById(userId, function(err, user) {
+            if (err) {
+              res.message = 'The user could not be found.';
+              return next(err);
+            } else if (!user) {
+              errMsg = 'The user could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              // check if any votes
+              if (poem.vote.positive.length === 0 || poem.vote.negative.length === 0) {
+                res.status(200).send({
+                  type : 'success',
+                  vote : 'None'
+                });
+              }
+
+              var vote, i;
+              async.waterfall([
+                function(callback) {
+                  // check if user voted positive
+                  for (i = poem.vote.positive.length - 1; i >= 0; --i) {
+                    if (poem.vote.positive[i] + '' === userId) {
+                      vote = 'up';
+                      callback(null, vote);
+                    }
+                    if (i === 0 && vote != 'up') {
+                      callback(null, vote);
+                    }
+                  }
+                },
+                function(vote, callback) {
+                  if (vote == 'up') {
+                    callback(null, vote);
+                  } else {
+
+                    // check if user voted negative
+                    for (i = poem.vote.negative.length - 1; i >= 0; --i) {
+                      if (poem.vote.negative[i] + '' === userId) {
+                        vote = 'down';
+                        callback(null, vote);
+                      }
+                    }
+                  }
+                },
+                function(vote, callback) {
+                  if (vote != 'up' && vote != 'down') {
+                    vote = 'None';
+                    callback(null, vote);
+                  } else {
+                    callback(null, vote);
+                  }
+                }
+              ], function(err, vote) {
+                sucMsg = 'Vote: ' + vote;
+                console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type : 'success',
+                    vote : vote
+                  });
+              });
+            }
+          });
+        }
+      });
+    }
+  );
 
   /**
    * Vote for a poem
