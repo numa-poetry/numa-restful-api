@@ -44,6 +44,15 @@ module.exports = function(app) {
     return decryptedText;
   }
 
+  // Function for sorting comments
+  function compare(a,b) {
+    if (a.createdAt < b.createdAt)
+       return -1;
+    if (a.createdAt > b.createdAt)
+      return 1;
+    return 0;
+  }
+
   function createToken(stayLoggedIn, user, req) {
     var expires, payload;
 
@@ -968,7 +977,8 @@ module.exports = function(app) {
 
       var errMsg;
 
-      Poem.find(function(err, poems) {
+      // sort by ascending order
+      Poem.find().sort('-createdAt').exec(function(err, poems) {
         if (err) {
           res.message = 'Could not retrieve all poems.';
           return next(err);
@@ -994,8 +1004,13 @@ module.exports = function(app) {
                   poem.id               = hashids.encryptHex(poem._id);
                   poem.creator          = creator;
                   poem.numberOfComments = poem.comments.length;
+                  poem.positiveVotes    = poem.vote.positive.length;
+                  poem.negativeVotes    = poem.vote.negative.length;
                   delete poem._id;
                   delete poem.__v;
+                  delete poem.vote;
+                  delete poem.comments;
+                  delete poem.vote;
                   resObj.push(poem);
                   callback();
                 }
@@ -1069,7 +1084,11 @@ module.exports = function(app) {
                       errMsg = 'A comment creator could not be found...';
                       console.log(errMsg.red);
                     } else {
-                      commentObj.creator = user.displayName || user.local.displayName;
+                      var creator         = {};
+                      creator.id          = hashids.encryptHex(user._id);
+                      creator.displayName = user.displayName || user.local.displayName;
+                      creator.avatarUrl   = user.avatarUrl;
+                      commentObj.creator  = creator;
                       comments.push(commentObj);
                       callback();
                     }
@@ -1078,6 +1097,9 @@ module.exports = function(app) {
               });
             },
             function(err) {
+              // Sort comments by createdAt in ascending order
+              comments.sort(compare);
+
               var creator         = {};
               creator.id          = hashids.encryptHex(user._id);
               creator.displayName = user.displayName || user.local.displayName;
@@ -1408,11 +1430,11 @@ module.exports = function(app) {
                   message : errMsg
                 });
               } else {
-                done(null);
+                done(null, commentId);
               }
           });
         }
-      ], function(err) {
+      ], function(err, commentId) {
         if (err) {
           res.message = 'Could not save the comment.';
           return next(err);
@@ -1420,8 +1442,9 @@ module.exports = function(app) {
           sucMsg = 'The comment was saved.';
           console.log(sucMsg.blue);
           res.status(200).send({
-            type    : 'success',
-            message : sucMsg
+            type      : 'success',
+            message   : sucMsg,
+            commentId : commentId
           });
         }
       });
