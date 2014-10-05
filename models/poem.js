@@ -3,6 +3,7 @@
 var mongoose   = require('mongoose');
 var timestamps = require('mongoose-timestamp');
 var voting     = require('mongoose-voting');
+var paginate   = require('mongoose-paginate');
 var User       = require('./user.js');
 var Comment    = require('./comment.js');
 var Schema     = mongoose.Schema;
@@ -20,5 +21,6 @@ var poemSchema = new Schema({
 // plugins ---------------------------------------------------------------------
 poemSchema.plugin(timestamps);
 poemSchema.plugin(voting);
+poemSchema.plugin(paginate);
 
 module.exports = mongoose.model('Poem', poemSchema);

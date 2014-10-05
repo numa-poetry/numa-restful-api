@@ -44,10 +44,18 @@ module.exports = function(app) {
     return decryptedText;
   }
 
-  // Function for sorting comments
-  function compare(a,b) {
+  // Function for sorting by creation date
+  function compareTimestampsAsc(a, b) {
     if (a.createdAt < b.createdAt)
-       return -1;
+      return 1;
+    if (a.createdAt > b.createdAt)
+      return -1;
+    return 0;
+  }
+
+  function compareTimestampsDesc(a, b) {
+    if (a.createdAt < b.createdAt)
+      return -1;
     if (a.createdAt > b.createdAt)
       return 1;
     return 0;
@@ -968,6 +976,76 @@ module.exports = function(app) {
   );
 
   /**
+   * Get 20 poems per page, paginating by page, sorted in ascending order by creation date
+   */
+  app.get('/api/v1/poem/page/:page',
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/poem'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var page = req.params.page;
+
+      async.waterfall([
+        function(done) {
+          Poem.paginate({}, page, 10, function(err, pageCount, paginatedPoems, itemCount) {
+            if (err) {
+              res.message = 'Could not retrieve poems.';
+              return next(err);
+            } else if (paginatedPoems.length === 0) {
+              errMsg = 'No more poems to retrieve';
+              console.log(errMsg.red);
+              res.status(200).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else {
+              done(null, paginatedPoems);
+            }
+          }, { sortBy : '-createdAt' });
+        }
+      ], function(err, paginatedPoems) {
+          // for each poem, get the creator's information
+          var resObj = [];
+          var creator = {};
+
+          async.each(paginatedPoems,
+            function(poem, callback) {
+              User.findById(poem.creator, function(err, user) {
+                if (user) {
+                  creator               = {};
+                  creator.id            = hashids.encryptHex(user._id);
+                  creator.displayName   = user.displayName || user.local.displayName;
+                  poem                  = poem.toObject();
+                  poem.id               = hashids.encryptHex(poem._id);
+                  poem.creator          = creator;
+                  poem.numberOfComments = poem.comments.length;
+                  poem.positiveVotes    = poem.vote.positive.length;
+                  poem.negativeVotes    = poem.vote.negative.length;
+
+                  delete poem._id;
+                  delete poem.__v;
+                  delete poem.vote;
+                  delete poem.comments;
+                  delete poem.vote;
+
+                  resObj.push(poem);
+                  callback();
+                }
+              });
+            },
+            function(err) {
+              // sort poems in ascending order by creation date
+              resObj.sort(compareTimestampsAsc);
+              res.status(200).send(resObj);
+            }
+          );
+        }
+      );
+    }
+  );
+
+  /**
    * Get all poems
    */
   app.get('/api/v1/poem',
@@ -1097,8 +1175,8 @@ module.exports = function(app) {
               });
             },
             function(err) {
-              // Sort comments by createdAt in ascending order
-              comments.sort(compare);
+              // Sort comments by createdAt in descending order
+              comments.sort(compareTimestampsDesc);
 
               var creator         = {};
               creator.id          = hashids.encryptHex(user._id);
