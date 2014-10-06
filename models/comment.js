@@ -8,9 +8,9 @@ var Schema     = mongoose.Schema;
 
 // schema ----------------------------------------------------------------------
 var commentSchema = new Schema({
-  creator  : { type: Schema.Types.ObjectId, ref: 'User' },
-  poem     : { type: Schema.Types.ObjectId, ref: 'Poem' },
-  comment  : { type: String }
+  creator : { type: Schema.Types.ObjectId, ref: 'User' },
+  poem    : { type: Schema.Types.ObjectId, ref: 'Poem' },
+  comment : { type: String }
 });
 
 // plugins ---------------------------------------------------------------------

@@ -1008,7 +1008,7 @@ module.exports = function(app) {
         }
       ], function(err, paginatedPoems, pageCount, poemCount) {
           // for each poem, get the creator's information
-          var resObj = [];
+          var resArr = [];
           var creator = {};
 
           async.each(paginatedPoems,
@@ -1031,19 +1031,19 @@ module.exports = function(app) {
                   delete poem.comments;
                   delete poem.vote;
 
-                  resObj.push(poem);
+                  resArr.push(poem);
                   callback();
                 }
               });
             },
             function(err) {
               // sort poems in ascending order by creation date
-              resObj.sort(compareTimestampsAsc);
+              resArr.sort(compareTimestampsAsc);
               res.status(200).send({
                 type      : 'success',
                 poemCount : poemCount,
                 pageCount : pageCount,
-                poems     : resObj
+                poems     : resArr
               });
             }
           );
@@ -1226,6 +1226,8 @@ module.exports = function(app) {
       console.log('\n[PUT] /api/v1/user/:userId/poem/:poemId'.bold.green);
       console.log('Request body:'.green, req.body);
 
+      // Verify userId matches poem's creator Id
+
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
         'title' : req.body.title,
         'poem'  : req.body.poem,
@@ -1249,6 +1251,123 @@ module.exports = function(app) {
             message : sucMsg
           });
         }
+      });
+    }
+  );
+
+  /**
+   * Delete a poem
+   */
+  app.delete('/api/v1/user/:userId/poem/:poemId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[DELETE] /api/v1/user/:userId/poem/:poemId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var poemId = hashids.decryptHex(req.params.poemId);
+      var userId = hashids.decryptHex(req.params.userId);
+
+      async.waterfall([
+        function(done) {
+          // Verify userId matches poem's creator id
+          Poem.findById(poemId, function(err, poem) {
+            if (err) {
+              res.message = 'The poem could not be found.';
+              return next(err);
+            } else if (!poem) {
+              errMsg = 'The poem could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else if (poem.creator == req.user._id + '') {
+              done(null);
+            } else {
+              console.log(poem.creator);
+              console.log(req.user._id);
+              errMsg = 'The requesting user is not the poem\'s creator.';
+              console.log(errMsg.red);
+              res.status(401).send({
+                type    : 'unauthorized',
+                message : errMsg
+              });
+            }
+          });
+        },
+        function(done) {
+          // Delete poem
+          Poem.findByIdAndRemove(poemId, function(err, poem) {
+            // if (err) {
+            //   res.message = 'The poem could not be deleted.';
+            //   return next(err);
+            // } else if (!poem) {
+            //   errMsg = 'The poem could not be found.';
+            //   console.log(errMsg.red);
+            //   res.status(404).send({
+            //     type    : 'not_found',
+            //     message : errMsg
+            //   });
+            // } else {
+              done(null, poem);
+            // }
+          });
+        },
+        function(poem, done) {
+          // Delete poem reference from user
+          User.findByIdAndUpdate(poem.creator, {
+            '$pull': {
+              poems: poem._id
+            }
+          }, function(err, user) {
+            // if (err) {
+            //   res.message = 'The user could not be found and updated.';
+            //   return next(err);
+            // } else if (!user) {
+            //   var errMsg = 'The user could not be found and updated.';
+            //   console.log(errMsg.red);
+            //   res.status(404).send({
+            //     type    : 'not_found',
+            //     message : errMsg
+            //   });
+            // } else {
+              done(null, poem, user);
+            // }
+          });
+        },
+        function(poem, user, done) {
+          // Delete poem comments from poem; iterate through poem.comments and for each
+          // find user by id and $pull poem reference from user.poems
+          async.each(poem.comments,
+            function(commentId, callback) {
+              // Delete poem comment
+              Comment.findByIdAndRemove(commentId, function(err, comment) {
+                if (comment) {
+                  console.log('there was a comment');
+                  // Delete poem comment reference from user
+                  User.findByIdAndUpdate(comment.creator, {
+                    '$pull': {
+                      comments: commentId
+                    }
+                  }, function(err, user) {
+                    callback();
+                  });
+                }
+              });
+            },
+            function(err) {
+              done(null);
+            }
+          );
+        }
+      ], function() {
+          sucMsg = 'The poem was deleted.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
       });
     }
   );
