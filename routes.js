@@ -867,10 +867,12 @@ module.exports = function(app) {
                 res.message = 'Could not get user details.';
                 return next(err);
               } else {
+                resObj.type = 'success';
                 res.status(200).send(resObj);
               }
             });
           } else {
+            resObj.type = 'success';
             res.status(200).send(resObj);
           }
         }
@@ -950,45 +952,45 @@ module.exports = function(app) {
   /**
    * Get all users
    */
-  app.get('/api/v1/user',
-    function(req, res, next) {
-      console.log('\n[GET] /api/v1/user'.bold.green);
-      console.log('Request body:'.green, req.body);
+  // app.get('/api/v1/user',
+  //   function(req, res, next) {
+  //     console.log('\n[GET] /api/v1/user'.bold.green);
+  //     console.log('Request body:'.green, req.body);
 
-      var errMsg;
+  //     var errMsg;
 
-      User.find(function(err, users) {
-        if (err) {
-          res.message = 'Could not retrieve all users.';
-          return next(err);
-        } else if (!users) {
-          errMsg = 'All users could not be found';
-          console.log(errMsg.red);
-          res.status(404).send({
-            type    : 'not_found',
-            message : errMsg
-          });
-        } else {
-          res.status(200).send(users);
-        }
-      });
-    }
-  );
+  //     User.find(function(err, users) {
+  //       if (err) {
+  //         res.message = 'Could not retrieve all users.';
+  //         return next(err);
+  //       } else if (!users) {
+  //         errMsg = 'All users could not be found';
+  //         console.log(errMsg.red);
+  //         res.status(404).send({
+  //           type    : 'not_found',
+  //           message : errMsg
+  //         });
+  //       } else {
+  //         res.status(200).send(users);
+  //       }
+  //     });
+  //   }
+  // );
 
   /**
-   * Get 20 poems per page, paginating by page, sorted in ascending order by creation date
+   * Get 25 poems per page, paginating by page, sorted in ascending order by creation date
    */
-  app.get('/api/v1/poem/page/:page',
+  app.get('/api/v1/poem/page/:number',
     function(req, res, next) {
       console.log('\n[GET] /api/v1/poem'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
-      var page = req.params.page;
+      var pageNumber = req.params.number;
 
       async.waterfall([
         function(done) {
-          Poem.paginate({}, page, 10, function(err, pageCount, paginatedPoems, itemCount) {
+          Poem.paginate({}, pageNumber, 25, function(err, pageCount, paginatedPoems, itemCount) {
             if (err) {
               res.message = 'Could not retrieve poems.';
               return next(err);
@@ -1000,11 +1002,11 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
-              done(null, paginatedPoems);
+              done(null, paginatedPoems, pageCount, itemCount);
             }
           }, { sortBy : '-createdAt' });
         }
-      ], function(err, paginatedPoems) {
+      ], function(err, paginatedPoems, pageCount, poemCount) {
           // for each poem, get the creator's information
           var resObj = [];
           var creator = {};
@@ -1037,7 +1039,12 @@ module.exports = function(app) {
             function(err) {
               // sort poems in ascending order by creation date
               resObj.sort(compareTimestampsAsc);
-              res.status(200).send(resObj);
+              res.status(200).send({
+                type      : 'success',
+                poemCount : poemCount,
+                pageCount : pageCount,
+                poems     : resObj
+              });
             }
           );
         }
@@ -1048,60 +1055,60 @@ module.exports = function(app) {
   /**
    * Get all poems
    */
-  app.get('/api/v1/poem',
-    function(req, res, next) {
-      console.log('\n[GET] /api/v1/poem'.bold.green);
-      console.log('Request body:'.green, req.body);
+  // app.get('/api/v1/poem',
+  //   function(req, res, next) {
+  //     console.log('\n[GET] /api/v1/poem'.bold.green);
+  //     console.log('Request body:'.green, req.body);
 
-      var errMsg;
+  //     var errMsg;
 
-      // sort by ascending order
-      Poem.find().sort('-createdAt').exec(function(err, poems) {
-        if (err) {
-          res.message = 'Could not retrieve all poems.';
-          return next(err);
-        } else if (!poems) {
-          errMsg = 'All poems could not be found';
-          console.log(errMsg.red);
-          res.status(404).send({
-            type    : 'not_found',
-            message : errMsg
-          });
-        } else {
+  //     // sort by ascending order
+  //     Poem.find().sort('-createdAt').exec(function(err, poems) {
+  //       if (err) {
+  //         res.message = 'Could not retrieve all poems.';
+  //         return next(err);
+  //       } else if (!poems) {
+  //         errMsg = 'All poems could not be found';
+  //         console.log(errMsg.red);
+  //         res.status(404).send({
+  //           type    : 'not_found',
+  //           message : errMsg
+  //         });
+  //       } else {
 
-          // for each poem, get the creator's _id and displayName
-          var resObj = [];
-          async.each(poems,
-            function(poem, callback) {
-              User.findById(poem.creator, function(err, user) {
-                if (user) {
-                  var creator           = {};
-                  creator.id            = hashids.encryptHex(user._id);
-                  creator.displayName   = user.displayName || user.local.displayName;
-                  poem                  = poem.toObject();
-                  poem.id               = hashids.encryptHex(poem._id);
-                  poem.creator          = creator;
-                  poem.numberOfComments = poem.comments.length;
-                  poem.positiveVotes    = poem.vote.positive.length;
-                  poem.negativeVotes    = poem.vote.negative.length;
-                  delete poem._id;
-                  delete poem.__v;
-                  delete poem.vote;
-                  delete poem.comments;
-                  delete poem.vote;
-                  resObj.push(poem);
-                  callback();
-                }
-              });
-            },
-            function(err) {
-              res.status(200).send(resObj);
-            }
-          );
-        }
-      });
-    }
-  );
+  //         // for each poem, get the creator's _id and displayName
+  //         var resObj = [];
+  //         async.each(poems,
+  //           function(poem, callback) {
+  //             User.findById(poem.creator, function(err, user) {
+  //               if (user) {
+  //                 var creator           = {};
+  //                 creator.id            = hashids.encryptHex(user._id);
+  //                 creator.displayName   = user.displayName || user.local.displayName;
+  //                 poem                  = poem.toObject();
+  //                 poem.id               = hashids.encryptHex(poem._id);
+  //                 poem.creator          = creator;
+  //                 poem.numberOfComments = poem.comments.length;
+  //                 poem.positiveVotes    = poem.vote.positive.length;
+  //                 poem.negativeVotes    = poem.vote.negative.length;
+  //                 delete poem._id;
+  //                 delete poem.__v;
+  //                 delete poem.vote;
+  //                 delete poem.comments;
+  //                 delete poem.vote;
+  //                 resObj.push(poem);
+  //                 callback();
+  //               }
+  //             });
+  //           },
+  //           function(err) {
+  //             res.status(200).send(resObj);
+  //           }
+  //         );
+  //       }
+  //     });
+  //   }
+  // );
 
   /*
    * Get poem by id
@@ -1203,7 +1210,7 @@ module.exports = function(app) {
           res.message = 'Could not save the poem.';
           return next(err);
         } else {
-          console.log(resObj);
+          resObj.type = 'success';
           res.status(200).send(resObj);
         }
       });
