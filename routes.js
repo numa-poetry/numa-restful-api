@@ -950,47 +950,32 @@ module.exports = function(app) {
   );
 
   /**
-   * Get all users
-   */
-  // app.get('/api/v1/user',
-  //   function(req, res, next) {
-  //     console.log('\n[GET] /api/v1/user'.bold.green);
-  //     console.log('Request body:'.green, req.body);
-
-  //     var errMsg;
-
-  //     User.find(function(err, users) {
-  //       if (err) {
-  //         res.message = 'Could not retrieve all users.';
-  //         return next(err);
-  //       } else if (!users) {
-  //         errMsg = 'All users could not be found';
-  //         console.log(errMsg.red);
-  //         res.status(404).send({
-  //           type    : 'not_found',
-  //           message : errMsg
-  //         });
-  //       } else {
-  //         res.status(200).send(users);
-  //       }
-  //     });
-  //   }
-  // );
-
-  /**
    * Get 25 poems per page, paginating by page, sorted in ascending order by creation date
+   *
+   * http://localhost:3000/api/v1/poem/?query=love&page=1&searchby=poem
+   *
+   * query    : normal search query (case insensitive)
+   * searchby : title (default), tags, poem (content)
+   * page     : page number
    */
-  app.get('/api/v1/poem/page/:number',
+  app.get('/api/v1/poem',
     function(req, res, next) {
-      console.log('\n[GET] /api/v1/poem'.bold.green);
+      console.log('\n[GET] /api/v1/poem/'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      var errMsg, sucMsg;
-      var pageNumber = req.params.number;
+      var poemQuery, pageNumber, searchBy, errMsg, sucMsg, query = {};
+
+      poemQuery  = req.query.query || null;
+      pageNumber = req.query.page || 1;
+      searchBy   = req.query.searchby || 'title';
+
+      if (poemQuery !== null) {
+        query[searchBy] = { $regex: poemQuery, $options: 'i' };
+      }
 
       async.waterfall([
         function(done) {
-          Poem.paginate({}, pageNumber, 25, function(err, pageCount, paginatedPoems, itemCount) {
+          Poem.paginate(query, pageNumber, 25, function(err, pageCount, paginatedPoems, itemCount) {
             if (err) {
               res.message = 'Could not retrieve poems.';
               return next(err);
@@ -1051,64 +1036,6 @@ module.exports = function(app) {
       );
     }
   );
-
-  /**
-   * Get all poems
-   */
-  // app.get('/api/v1/poem',
-  //   function(req, res, next) {
-  //     console.log('\n[GET] /api/v1/poem'.bold.green);
-  //     console.log('Request body:'.green, req.body);
-
-  //     var errMsg;
-
-  //     // sort by ascending order
-  //     Poem.find().sort('-createdAt').exec(function(err, poems) {
-  //       if (err) {
-  //         res.message = 'Could not retrieve all poems.';
-  //         return next(err);
-  //       } else if (!poems) {
-  //         errMsg = 'All poems could not be found';
-  //         console.log(errMsg.red);
-  //         res.status(404).send({
-  //           type    : 'not_found',
-  //           message : errMsg
-  //         });
-  //       } else {
-
-  //         // for each poem, get the creator's _id and displayName
-  //         var resObj = [];
-  //         async.each(poems,
-  //           function(poem, callback) {
-  //             User.findById(poem.creator, function(err, user) {
-  //               if (user) {
-  //                 var creator           = {};
-  //                 creator.id            = hashids.encryptHex(user._id);
-  //                 creator.displayName   = user.displayName || user.local.displayName;
-  //                 poem                  = poem.toObject();
-  //                 poem.id               = hashids.encryptHex(poem._id);
-  //                 poem.creator          = creator;
-  //                 poem.numberOfComments = poem.comments.length;
-  //                 poem.positiveVotes    = poem.vote.positive.length;
-  //                 poem.negativeVotes    = poem.vote.negative.length;
-  //                 delete poem._id;
-  //                 delete poem.__v;
-  //                 delete poem.vote;
-  //                 delete poem.comments;
-  //                 delete poem.vote;
-  //                 resObj.push(poem);
-  //                 callback();
-  //               }
-  //             });
-  //           },
-  //           function(err) {
-  //             res.status(200).send(resObj);
-  //           }
-  //         );
-  //       }
-  //     });
-  //   }
-  // );
 
   /*
    * Get poem by id
