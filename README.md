@@ -16,3 +16,6 @@ I'm developing Numa because I care about connecting with people; sharing express
 * Rename pub-auth.js to auth.js in config/ and add in your own secrets.
 * Launch server: `nodemon .\server.js`. 
 * Visit `http://localhost:3000` or hit the endpoints using a client like the [Advanced REST Client](https://chrome.google.com/webstore/detail/advanced-rest-client/hgmloofddffdnphfgcellkdfbfbjeloo?hl=en-US) Chrome extension
+
+## Where can I see the documentation?
+I'll be adding the RESTful API docs at [ReadMe.io](http://numa.readme.io/v1.0)
