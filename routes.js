@@ -204,6 +204,7 @@ module.exports = function(app) {
               delete newUser.password;
               var token = createToken(req.body.stayLoggedIn, newUser, req);
               res.status(201).send({
+                type  : 'success',
                 id    : hashids.encryptHex(newUser._id),
                 token : token
               });
@@ -236,6 +237,7 @@ module.exports = function(app) {
             delete user.password;
             var token = createToken(req.body.stayLoggedIn, user, req);
             res.status(201).send({
+              type  : 'success',
               id    : hashids.encryptHex(user._id),
               token : token
             });
@@ -330,7 +332,7 @@ module.exports = function(app) {
             }
           }));
           var clientHost = 'localhost:9000';
-          var redirectLink = 'http://' + clientHost + '/#/reset?token=' + token;
+          var redirectLink = 'http://' + clientHost + '/#!/reset?token=' + token;
           console.log(redirectLink);
           var mailOptions = {
             to      : user.email,
@@ -467,7 +469,7 @@ module.exports = function(app) {
           res.message = 'Could not send changed password confirmation email.';
           return next(err);
         } else {
-          var sucMsg = 'A changed password confirmation email has been sent to ' + user.email;
+          var sucMsg = 'A changed password confirmation email has been sent to ' + user.email + '.';
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -785,18 +787,18 @@ module.exports = function(app) {
 
   /**
    * Get a user
-   * Request body:
-   *   If req.body.type === 'Basic', send minimal user info
-   *   If req.body.type === 'Full', send minimal info + poem titles + comments
+   * query:
+   *   If req.query.type === 'full', send full profile
    */
-  app.post('/api/v1/user/:id',
+  app.get('/api/v1/user/:id',
     function(req, res, next) {
-      console.log('\n[POST] /api/v1/user/:id'.bold.green);
+      console.log('\n[GET] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var errMsg;
+      var userId = hashids.decryptHex(req.params.id);
 
-      User.findById(hashids.decryptHex(req.params.id), function(err, user) {
+      User.findById(userId, function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
@@ -811,11 +813,11 @@ module.exports = function(app) {
           var resObj         = {};
           resObj.id          = hashids.encryptHex(user._id);
           resObj.displayName = user.local.displayName || user.displayName;
-          resObj.joinedDate  = user.createdAt;
+          resObj.createdAt   = user.createdAt;
           resObj.email       = user.email;
           resObj.avatarUrl   = user.avatarUrl;
 
-          if (req.body.type === 'Full') {
+          if (req.query.type === 'full') {
             // gather user poem titles and user comments
             var poems = [];
 
@@ -825,7 +827,7 @@ module.exports = function(app) {
                   function(id, callback) {
                     Poem.findById(id, function(err, poem) {
                       if (poem) {
-                        var poemObj = {};
+                        var poemObj       = {};
                         poemObj.id        = hashids.encryptHex(poem._id),
                         poemObj.title     = poem.title;
                         poemObj.poem      = poem.poem;
@@ -975,7 +977,7 @@ module.exports = function(app) {
 
       async.waterfall([
         function(done) {
-          Poem.paginate(query, pageNumber, 25, function(err, pageCount, paginatedPoems, itemCount) {
+          Poem.paginate(query, pageNumber, 8, function(err, pageCount, paginatedPoems, itemCount) {
             if (err) {
               res.message = 'Could not retrieve poems.';
               return next(err);
@@ -1369,8 +1371,6 @@ module.exports = function(app) {
                 message : errMsg
               });
             } else {
-              console.log(poem.vote);
-              console.log(userId);
               // check if any votes
               if (poem.vote.positive.length === 0 && poem.vote.negative.length === 0) {
                 res.status(200).send({
