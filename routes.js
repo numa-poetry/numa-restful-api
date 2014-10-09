@@ -982,23 +982,34 @@ module.exports = function(app) {
       } else {
         caseInsensitiveRegex = { $regex: poemQuery, $options: 'i' };
 
-        // if multiple query strings, OR them together for a query
+        // if multiple query strings, AND them together for a query
         if (searchBy instanceof Array && searchBy.length > 1) {
-          console.log('1')
-          query['$or'] = [];
           var field, i;
-          for (i = searchBy.length - 1; i >= 0; i--) {
-            field = searchBy[i];
-            if (field === 'content') {
-              query['$or'].push({ 'poem': caseInsensitiveRegex });
-            } else if (field === 'tag') {
-              query['$or'].push({ 'tags': caseInsensitiveRegex });
-            } else if (field === 'title') {
-              query['$or'].push({ 'title': caseInsensitiveRegex });
-            }
-          };
+          if (req.query.strict === 'true') {
+            for (i = searchBy.length - 1; i >= 0; i--) {
+              field = searchBy[i];
+              if (field === 'content') {
+                query['poem'] = caseInsensitiveRegex;
+              } else if (field === 'tag') {
+                query['tags'] = caseInsensitiveRegex;
+              } else if (field === 'title') {
+                query['title'] = caseInsensitiveRegex;
+              }
+            };
+          } else {
+            query['$or'] = [];
+            for (i = searchBy.length - 1; i >= 0; i--) {
+              field = searchBy[i];
+              if (field === 'content') {
+                query['$or'].push({ 'poem': caseInsensitiveRegex });
+              } else if (field === 'tag') {
+                query['$or'].push({ 'tags': caseInsensitiveRegex });
+              } else if (field === 'title') {
+                query['$or'].push({ 'title': caseInsensitiveRegex });
+              }
+            };
+          }
         } else if (searchBy instanceof Array && searchBy.length === 1) {
-          console.log('2')
           if (searchBy[0] === 'content') {
             query['poem'] = caseInsensitiveRegex;
           } else if (searchBy[0] === 'tag') {
@@ -1007,7 +1018,6 @@ module.exports = function(app) {
             query['title'] = caseInsensitiveRegex;
           }
         } else if (typeof searchBy === 'string') {
-          console.log('3')
           if (searchBy === 'content') {
             query['poem'] = caseInsensitiveRegex;
           } else if (searchBy === 'tag') {
