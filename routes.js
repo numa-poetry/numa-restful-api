@@ -788,7 +788,7 @@ module.exports = function(app) {
   /**
    * Get a user
    * query:
-   *   If req.query.type === 'full', send full profile
+   *   If req.query.profile === 'full', send full profile
    */
   app.get('/api/v1/user/:id',
     function(req, res, next) {
@@ -817,7 +817,7 @@ module.exports = function(app) {
           resObj.email       = user.email;
           resObj.avatarUrl   = user.avatarUrl;
 
-          if (req.query.type === 'full') {
+          if (req.query.profile === 'full') {
             // gather user poem titles and user comments
             var poems = [];
 
@@ -847,12 +847,14 @@ module.exports = function(app) {
                 var comments = [];
                 async.each(user.comments,
                   function(id, callback) {
-                    Comment.findById(id, function(err, comment) {
+                    Comment.findById(id).populate('poem').exec(function(err, comment) {
                       if (comment) {
                         var commentObj       = {};
                         commentObj.id        = hashids.encryptHex(comment._id),
                         commentObj.comment   = comment.comment;
                         commentObj.createdAt = comment.createdAt;
+                        commentObj.poemId    = hashids.encryptHex(comment.poem._id);
+                        commentObj.poemTitle = comment.poem.title;
                         comments.push(commentObj);
                         callback();
                       }
@@ -1240,6 +1242,91 @@ module.exports = function(app) {
   );
 
   /**
+   * Delete a comment (as creator)
+   */
+  app.delete('/api/v1/user/:userId/poem/:poemId/comment/:commentId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[DELETE] /api/v1/user/:userId/poem/:poemId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId    = hashids.decryptHex(req.params.userId);
+      var poemId    = hashids.decryptHex(req.params.poemId);
+      var commentId = hashids.decryptHex(req.params.commentId);
+      // console.log('userid:', userId);
+      // console.log('poemid:', poemId);
+      // console.log('commentid:', commentId);
+
+      async.waterfall([
+        function(done) {
+          Comment.findById(commentId).populate('poem').exec(function(err, comment) {
+            if (err) {
+              res.message = 'The comment could not be found.';
+              return next(err);
+            } else if (!comment) {
+              errMsg = 'The comment could not be found.';
+              console.log(errMsg.red);
+              res.status(404).send({
+                type    : 'not_found',
+                message : errMsg
+              });
+            } else if (comment.poem.creator == req.user._id + '') {
+              done(null);
+            } else {
+              errMsg = 'The requesting user is not the poem\'s creator.';
+              console.log(errMsg.red);
+              res.status(401).send({
+                type    : 'unauthorized',
+                message : errMsg
+              });
+            }
+          });
+        },
+        function(done) {
+          // Delete comment
+          Comment.findByIdAndRemove(commentId, function(err, comment) {
+            if (comment) {
+              done(null, comment);
+            }
+          });
+        },
+        function(comment, done) {
+          // Delete comment ref from user
+          User.findByIdAndUpdate(comment.creator, {
+            '$pull': {
+              comments: comment._id
+            }
+          }, function(err, user) {
+            if (user) {
+              done(null, comment, user);
+            }
+          });
+        },
+        function(comment, user, done) {
+          // Delete comment ref from poem
+          Poem.findByIdAndUpdate(comment.poem, {
+            '$pull': {
+              comments: comment._id
+            }
+          }, function(err, poem) {
+            if (poem) {
+              done(null);
+            }
+          });
+        }
+      ], function() {
+        sucMsg = 'The comment was deleted.';
+        console.log(sucMsg.blue);
+        res.status(200).send({
+          type    : 'success',
+          message : sucMsg
+        });
+      });
+    }
+  );
+
+  /**
    * Delete a poem
    */
   app.delete('/api/v1/user/:userId/poem/:poemId',
@@ -1254,7 +1341,6 @@ module.exports = function(app) {
 
       async.waterfall([
         function(done) {
-          // Verify userId matches poem's creator id
           Poem.findById(poemId, function(err, poem) {
             if (err) {
               res.message = 'The poem could not be found.';
@@ -1269,8 +1355,9 @@ module.exports = function(app) {
             } else if (poem.creator == req.user._id + '') {
               done(null);
             } else {
-              console.log(poem.creator);
-              console.log(req.user._id);
+              // userId doesn't match poem's creator id
+              // console.log(poem.creator);
+              // console.log(req.user._id);
               errMsg = 'The requesting user is not the poem\'s creator.';
               console.log(errMsg.red);
               res.status(401).send({
@@ -1630,7 +1717,7 @@ module.exports = function(app) {
           res.status(200).send({
             type      : 'success',
             message   : sucMsg,
-            commentId : commentId
+            commentId : hashids.encryptHex(commentId)
           });
         }
       });
