@@ -957,7 +957,7 @@ module.exports = function(app) {
    * http://localhost:3000/api/v1/poem/?query=love&page=1&searchby=poem
    *
    * query    : normal search query (case insensitive)
-   * searchby : title (default), tags, poem (content)
+   * searchby : title, tag, content
    * page     : page number
    */
   app.get('/api/v1/poem',
@@ -965,15 +965,60 @@ module.exports = function(app) {
       console.log('\n[GET] /api/v1/poem/'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      var poemQuery, pageNumber, searchBy, errMsg, sucMsg, query = {};
+      var poemQuery, pageNumber, searchBy, errMsg, sucMsg, caseInsensitiveRegex, query = {};
 
       poemQuery  = req.query.query || null;
       pageNumber = req.query.page || 1;
-      searchBy   = req.query.searchby || 'title';
 
-      if (poemQuery !== null) {
-        query[searchBy] = { $regex: poemQuery, $options: 'i' };
+      if (typeof req.query.searchby === 'undefined') {
+        searchBy = 'title';
+      } else {
+        searchBy = req.query.searchby.split(',');
       }
+
+      // find all documents
+      if (poemQuery === null) {
+        query = {};
+      } else {
+        caseInsensitiveRegex = { $regex: poemQuery, $options: 'i' };
+
+        // if multiple query strings, OR them together for a query
+        if (searchBy instanceof Array && searchBy.length > 1) {
+          console.log('1')
+          query['$or'] = [];
+          var field, i;
+          for (i = searchBy.length - 1; i >= 0; i--) {
+            field = searchBy[i];
+            if (field === 'content') {
+              query['$or'].push({ 'poem': caseInsensitiveRegex });
+            } else if (field === 'tag') {
+              query['$or'].push({ 'tags': caseInsensitiveRegex });
+            } else if (field === 'title') {
+              query['$or'].push({ 'title': caseInsensitiveRegex });
+            }
+          };
+        } else if (searchBy instanceof Array && searchBy.length === 1) {
+          console.log('2')
+          if (searchBy[0] === 'content') {
+            query['poem'] = caseInsensitiveRegex;
+          } else if (searchBy[0] === 'tag') {
+            query['tags'] = caseInsensitiveRegex;
+          } else if (searchBy[0] === 'title') {
+            query['title'] = caseInsensitiveRegex;
+          }
+        } else if (typeof searchBy === 'string') {
+          console.log('3')
+          if (searchBy === 'content') {
+            query['poem'] = caseInsensitiveRegex;
+          } else if (searchBy === 'tag') {
+            query['tags'] = caseInsensitiveRegex;
+          } else if (searchBy === 'title') {
+            query['title'] = caseInsensitiveRegex;
+          }
+        }
+      }
+
+      console.log(query);
 
       async.waterfall([
         function(done) {

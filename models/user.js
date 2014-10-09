@@ -21,7 +21,7 @@ var userSchema = new Schema({
   password             : { type: String },
   avatarUrl            : { type: String },
 
-  local                : { displayName: { type: String, unique: true, trim: true } },
+  local                : { displayName: { type: String, unique: true, sparse: true, trim: true } },
 
   loginAttempts        : { type: Number, required: true, default: 0 },
   lockUntil            : { type: Number },
