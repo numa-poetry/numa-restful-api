@@ -30,7 +30,8 @@ var userSchema = new Schema({
   resetPasswordExpires : { type: Date },
 
   poems                : [{ type: Schema.Types.ObjectId, ref: 'Poem' }],
-  comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }]
+  comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
+  favoritePoems        : [{ type: Schema.Types.ObjectId, ref: 'Poem' }]
 });
 
 userSchema.virtual('isLocked').get(function() {

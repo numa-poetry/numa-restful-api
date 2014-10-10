@@ -865,7 +865,29 @@ module.exports = function(app) {
                     done(null, resObj);
                   }
                 );
-              }
+              },
+              function(resObj, done) {
+                var favoritePoems = [];
+                async.each(user.favoritePoems,
+                  function(id, callback) {
+                    Poem.findById(id, function(err, poem) {
+                      if (poem) {
+                        var favoritePoemObj       = {};
+                        favoritePoemObj.id        = hashids.encryptHex(poem._id),
+                        favoritePoemObj.title     = poem.title;
+                        favoritePoemObj.poem      = poem.poem;
+                        favoritePoemObj.createdAt = poem.createdAt;
+                        favoritePoems.push(favoritePoemObj);
+                        callback();
+                      }
+                    });
+                  },
+                  function(err) {
+                    resObj.favoritePoems = favoritePoems;
+                    done(null, resObj);
+                  }
+                );
+              },
             ], function(err, resObj) {
               if (err) {
                 res.message = 'Could not get user details.';
@@ -1271,7 +1293,7 @@ module.exports = function(app) {
                 type    : 'not_found',
                 message : errMsg
               });
-            } else if (comment.poem.creator == req.user._id + '') {
+            } else if ((comment.poem.creator == req.user._id + '') || (comment.creator == req.user._id + '')) {
               done(null);
             } else {
               errMsg = 'The requesting user is not the poem\'s creator.';
@@ -1718,6 +1740,130 @@ module.exports = function(app) {
             type      : 'success',
             message   : sucMsg,
             commentId : hashids.encryptHex(commentId)
+          });
+        }
+      });
+    }
+  );
+
+  /**
+   * Get poem status (favorited or not)
+   */
+  app.get('/api/v1/user/:userId/poem/:poemId/favorite',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:userId/poem/:poemId/favorite'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId = req.user._id;
+      var poemId = hashids.decryptHex(req.params.poemId);
+
+      User.findOne({ 'favoritePoems': poemId, '_id': userId }, function(err, user) {
+        if (user) {
+          sucMsg = 'Poem is favorited.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            status  : 'favorited',
+            message : sucMsg
+          });
+        } else if (!user) {
+          sucMsg = 'Poem is not favorited.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            status  : 'not_favorited',
+            message : sucMsg
+          });
+        }
+      });
+    }
+  );
+
+
+  /**
+   * Favorite a poem
+   */
+  app.post('/api/v1/user/:userId/poem/:poemId/favorite',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:userId/poem/:poemId/favorite'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId = req.user._id;
+      var poemId = hashids.decryptHex(req.params.poemId);
+
+      Poem.findById(poemId, function(err, poem) {
+        if (err) {
+          res.message = 'The poem could not be found.';
+          return next(err);
+        } else if (!poem) {
+          var errMsg = 'The poem could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+
+          User.findOne({ 'favoritePoems': poemId, '_id': userId }, function(err, user) {
+            if (user) {
+              // Remove reference
+              User.findByIdAndUpdate(userId, {
+                '$pull': {
+                  favoritePoems: poemId
+                }
+              }, function(err, user) {
+                if (err) {
+                  res.message = 'The user could not be found and updated.';
+                  return next(err);
+                } else if (!user) {
+                  errMsg = 'The user could not be found and updated.';
+                  console.log(errMsg.red);
+                  res.status(404).send({
+                    type    : 'not_found',
+                    message : errMsg
+                  });
+                } else {
+                  sucMsg = 'The poem was removed from favorites.';
+                  console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type    : 'success',
+                    status  : 'removed',
+                    message : sucMsg
+                  });
+                }
+              });
+            } else if (!user) {
+              // Add reference
+              User.findByIdAndUpdate(userId, {
+                '$addToSet': {
+                  favoritePoems: poemId
+                }
+              }, function(err, user) {
+                if (err) {
+                  res.message = 'The user could not be found and updated.';
+                  return next(err);
+                } else if (!user) {
+                  var errMsg = 'The user could not be found and updated.';
+                  console.log(errMsg.red);
+                  res.status(404).send({
+                    type    : 'not_found',
+                    message : errMsg
+                  });
+                } else {
+                  var sucMsg = 'The poem was favorited.';
+                  console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type    : 'success',
+                    status  : 'favorited',
+                    message : sucMsg
+                  });
+                }
+              });
+            }
           });
         }
       });
