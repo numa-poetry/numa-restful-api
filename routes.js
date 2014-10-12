@@ -1196,6 +1196,7 @@ module.exports = function(app) {
               var creator         = {};
               creator.id          = hashids.encryptHex(user._id);
               creator.displayName = user.displayName || user.local.displayName;
+              creator.avatarUrl   = user.avatarUrl;
               poem                = poem.toObject();
               poem.positiveVotes  = poem.vote.positive.length;
               poem.negativeVotes  = poem.vote.negative.length;
