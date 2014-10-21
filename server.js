@@ -65,9 +65,6 @@ try {
     }));
   }
 
-// routes ----------------------------------------------------------------------
-  require('./routes.js')(app);
-
 // middleware ------------------------------------------------------------------
   var pe = new PrettyError();
 
@@ -85,13 +82,29 @@ try {
   pe.skipPackage('express'); // this will skip all the trace lines about express' core and sub-modules
 
 // sockets ---------------------------------------------------------------------
+  // hash of socket ids to sockets
+  var clientSocketsHash = {};
+
   io.on('connection', function(socket) {
-    console.log('\nsocket.io connection initiated.');
-    socket.emit('news', { hello: 'world' });
-    socket.on('my other event', function(data) {
-      console.log(data);
+    console.log('\nsocket connection with ' + socket.id);
+    clientSocketsHash[socket.id] = socket;
+    console.log('connected clients:', Object.keys(clientSocketsHash));
+
+    // emit socket id to client
+    socket.emit('socketId', { id : socket.id });
+
+    // socket.emit('news', { hello: 'world' });
+    // socket.on('my other event', function(data) {
+    //   console.log(data);
+    // });
+    socket.on('disconnect', function() {
+      console.log('\nsocket disconnection with ' + socket.id);
+      delete clientSocketsHash[socket.id];
     });
   });
+
+// routes ----------------------------------------------------------------------
+  require('./routes.js')(app, io, clientSocketsHash);
 
 // run server ------------------------------------------------------------------
   server.listen(port, function() {

@@ -30,7 +30,10 @@ var s3Client = s3.createClient({
 });
 
 // routes ----------------------------------------------------------------------
-module.exports = function(app) {
+module.exports = function(app, io, clientSocketsHash) {
+
+  // Hash of MongoDB _ids to socket ids
+  var loggedInClientsHash = {};
 
   function encrypt(text) {
     var cipher        = crypto.createCipher(auth.ENCRYPTION_KEY, auth.ENCRYPTION_ALGO);
@@ -203,6 +206,7 @@ module.exports = function(app) {
               newUser = newUser.toObject();
               delete newUser.password;
               var token = createToken(req.body.stayLoggedIn, newUser, req);
+
               res.status(201).send({
                 type  : 'success',
                 id    : hashids.encryptHex(newUser._id),
@@ -236,6 +240,12 @@ module.exports = function(app) {
             user = user.toObject();
             delete user.password;
             var token = createToken(req.body.stayLoggedIn, user, req);
+
+            if (req.headers.socketid) {
+              loggedInClientsHash[user._id + ''] = req.headers.socketid;
+              console.log('logged in clients:', Object.keys(loggedInClientsHash));
+            }
+
             res.status(201).send({
               type  : 'success',
               id    : hashids.encryptHex(user._id),
@@ -274,6 +284,28 @@ module.exports = function(app) {
           }
         }
       );
+    }
+  );
+
+  /**
+   * Local logout
+   */
+  app.get('/api/v1/user/:id/logout',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/logout'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      if (req.headers.socketid) {
+        console.log('Logging out client');
+        delete loggedInClientsHash[req.user._id + ''];
+        console.log('logged in clients:', Object.keys(loggedInClientsHash));
+      }
+
+      res.status(200).send({
+        type    : 'success',
+        message : 'User logged out.'
+      });
     }
   );
 
@@ -1510,14 +1542,14 @@ module.exports = function(app) {
 
       var poemId = hashids.decryptHex(req.params.poemId);
       var userId = req.user._id + ''; // for str compare in async.series below
-      var sucMsg;
+      var sucMsg, errMsg;
 
       Poem.findById(poemId, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
           return next(err);
         } else if (!poem) {
-          var errMsg = 'The poem could not be found.';
+          errMsg = 'The poem could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
@@ -1534,6 +1566,13 @@ module.exports = function(app) {
               res.status(404).send({
                 type    : 'not_found',
                 message : errMsg
+              });
+            } else if (user._id+'' === poem.creator+'') {
+              sucMsg = 'The creator cannot vote on own poem.';
+              console.log(sucMsg.blue);
+              res.status(200).send({
+                type    : 'success',
+                message : sucMsg
               });
             } else {
               // check if any votes
@@ -1726,21 +1765,31 @@ module.exports = function(app) {
                   message : errMsg
                 });
               } else {
-                done(null, commentId);
+                var creatorId = poem.creator;
+                done(null, commentId, creatorId);
               }
           });
         }
-      ], function(err, commentId) {
+      ], function(err, commentId, creatorId) {
         if (err) {
           res.message = 'Could not save the comment.';
           return next(err);
         } else {
           sucMsg = 'The comment was saved.';
           console.log(sucMsg.blue);
+
+          // When a new comment is saved, push a notification to the creator if he is logged in
+          var socket = clientSocketsHash[loggedInClientsHash[creatorId]];
+          if (socket !== undefined) {
+            console.log('emitting newComment event');
+            socket.emit('newComment', { poemId: poemId });
+          }
+
           res.status(200).send({
             type      : 'success',
             message   : sucMsg,
-            commentId : hashids.encryptHex(commentId)
+            commentId : hashids.encryptHex(commentId),
+            creatorId : hashids.encryptHex(creatorId)
           });
         }
       });
@@ -1883,10 +1932,11 @@ module.exports = function(app) {
       var sucMsg;
 
       var newPoem = new Poem({
-        creator : req.user._id,
-        title   : req.body.title,
-        poem    : req.body.poem,
-        tags    : req.body.tags
+        creator  : req.user._id,
+        title    : req.body.title,
+        poem     : req.body.poem,
+        tags     : req.body.tags,
+        imageUrl : req.body.imageUrl
       });
 
       newPoem.save(function(err, poem) {
@@ -2039,6 +2089,77 @@ module.exports = function(app) {
   // );
 
   /**
+   * Upload inspirational image for poem
+   */
+  app.post('/api/v1/user/:id/poem/image',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:id/poem/image'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+
+      async.waterfall([
+        function(done) {
+
+          // Upload avatar to S3
+          var form = new multiparty.Form();
+          form.parse(req, function(err, fields, files) {
+            var file        = files.file[0];
+            var contentType = file.headers['content-type'];
+            var extension   = file.path.substring(file.path.lastIndexOf('.'));
+            var destPath    = hashids.encryptHex(req.user._id) + '/poems/' + uuid.v4() + extension; // file.originalFilename
+
+            // server side file type checker
+            if (contentType !== 'image/png' && contentType !== 'image/jpeg' && contentType !== 'image/jpg' &&
+                contentType !== 'image/gif') {
+              errMsg = 'Unsupported file type for image upload: ' + contentType;
+              console.log(errMsg.red);
+              fs.unlink(tmpPath);
+              res.status(400).send({
+                type    : 'bad_request',
+                message : errMsg
+              });
+            }
+
+            var params = {
+              localFile: file.path,
+              s3Params: {
+                Bucket: auth.amazon_s3.BUCKET_PERMANENT,
+                Key: destPath
+              }
+            };
+
+            var uploader = s3Client.uploadFile(params);
+
+            uploader.on('error', function(err) {
+              errMsg = 'Unable to upload to permanent bucket.';
+              console.log(errMsg.red);
+              return next(err);
+            });
+
+            uploader.on('end', function() {
+              sucMsg = 'Successful upload to permanent bucket.';
+              console.log(sucMsg.blue);
+              done(null, destPath);
+            });
+          });
+        },
+        function(destPath, done) {
+          var imageUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+          done(null, imageUrl);
+        }
+      ], function(err, imageUrl) {
+          console.log('Image found at:', imageUrl);
+          res.status(200).send({
+            type     : 'success',
+            imageUrl : imageUrl
+          });
+      });
+    }
+  );
+
+  /**
    * Upload avatar for user profile
    */
   app.post('/api/v1/user/:id/avatar',
@@ -2062,8 +2183,8 @@ module.exports = function(app) {
             var destPath    = hashids.encryptHex(req.user._id) + '/profile/' + uuid.v4() + extension; // file.originalFilename
 
             // server side file type checker
-            if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
-              errMsg = 'Unsupported file type for image upload.';
+            if (contentType !== 'image/png' && contentType !== 'image/jpeg' && contentType !== 'image/jpg') {
+              errMsg = 'Unsupported file type for image upload: ' + contentType;
               console.log(errMsg.red);
               fs.unlink(tmpPath);
               res.status(400).send({
