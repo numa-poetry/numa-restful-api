@@ -36,3 +36,5 @@ logfile.txt
 
 # Credentials
 config/auth.js
+
+tmp

@@ -15,12 +15,15 @@ var multiparty    = require('multiparty');
 var uuid          = require('uuid');
 var s3            = require('s3');
 var fs            = require('fs');
+var PDFDocument   = require('pdfkit');
 var User          = require('./models/user.js');
 var Poem          = require('./models/poem.js');
 var Comment       = require('./models/comment.js');
 var auth          = require('./config/auth.js');
 
 var hashids = new Hashids(auth.HASHIDS_SALT);
+
+var pdfStream = new PDFDocument;
 
 var s3Client = s3.createClient({
   s3Options: {
@@ -160,6 +163,34 @@ module.exports = function(app, io, clientSocketsHash) {
       res.status(200).send({
         type    : 'success',
         message : 'Welcome to the Numa API! Have fun.'
+      });
+    }
+  );
+
+  /**
+   * Create PDF of user poems
+   */
+  app.get('/api/v1/user/:id/poem/pdf',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/poem/pdf'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      pdfStream.pipe(fs.createWriteStream(__dirname + '/tmp/test.pdf'));
+      pdfStream.fontSize(15);
+      pdfStream.text('test');
+      pdfStream.end();
+
+      var filePath = __dirname + '/tmp/test.pdf';
+      var fileName = 'new.pdf';
+
+      res.download(filePath, fileName, function(err) {
+        if (err) {
+          console.log(err);
+          // if (!res.headersSent) ...
+        } else {
+          console.log('Send:', fileName);
+        }
       });
     }
   );
