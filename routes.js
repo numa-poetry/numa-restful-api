@@ -168,7 +168,7 @@ module.exports = function(app, io, clientSocketsHash) {
   );
 
   /**
-   * Create PDF of user poems
+   * Generate PDF of user poems
    */
   app.get('/api/v1/user/:id/poem/pdf',
     ensureAuthenticated,
@@ -881,6 +881,7 @@ module.exports = function(app, io, clientSocketsHash) {
           resObj.avatarUrl   = user.avatarUrl;
 
           if (req.query.profile === 'full') {
+
             // gather user poem titles and user comments
             var poems = [];
 
@@ -1415,7 +1416,7 @@ module.exports = function(app, io, clientSocketsHash) {
   /**
    * Delete inspirational image from poem
    */
-  app.delete('/api/v1/user/:id/poem/image',
+  app.delete('/api/v1/user/:id/poemimage',
     ensureAuthenticated,
     function(req, res, next) {
       console.log('\n[DELETE] /api/v1/user/:id/poem/image'.bold.green);
@@ -1543,11 +1544,11 @@ module.exports = function(app, io, clientSocketsHash) {
             //     message : errMsg
             //   });
             // } else {
-              done(null, poem, user);
+              done(null, poem);
             // }
           });
         },
-        function(poem, user, done) {
+        function(poem, done) {
           // Delete poem comments from poem; iterate through poem.comments and for each
           // find user by id and $pull poem reference from user.poems
           async.each(poem.comments,
@@ -1568,10 +1569,20 @@ module.exports = function(app, io, clientSocketsHash) {
               });
             },
             function(err) {
-              done(null);
+              done(null, poem);
             }
           );
-        }
+        },
+        function(poem, done) {
+          // Delete poem from all users' favorites
+          User.update({}, {'$pull': {favoritePoems: poem._id}}, { multi: true }, function(err) {
+            if (err) {
+              console.log('Error in removing poem from User favoritePoems.');
+            } else {
+              done(null);
+            }
+          });
+        },
       ], function() {
           sucMsg = 'The poem was deleted.';
           console.log(sucMsg.blue);
