@@ -1382,6 +1382,60 @@ module.exports = function(app, io, clientSocketsHash) {
   );
 
   /**
+   * Delete inspirational image from poem
+   */
+  app.delete('/api/v1/user/:id/poem/image',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[DELETE] /api/v1/user/:id/poem/image'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      if (req.body.imageUrl) {
+        var remoteImage = req.body.imageUrl.split(".com/").pop();
+
+        var errMsg, sucMsg;
+
+        var s3Params = {
+          Bucket : auth.amazon_s3.BUCKET_PERMANENT,
+          Delete : {
+            Objects: [{
+              Key : remoteImage
+            }]
+          }
+        };
+
+        var deleter = s3Client.deleteObjects(s3Params);
+
+        deleter.on('error', function(err) {
+          errMsg = 'Unable to delete image.';
+          console.log(errMsg.red);
+          res.status(500).send({
+            type    : 'internal_server_error',
+            message : errMsg
+          });
+        });
+
+        deleter.on('end', function() {
+          sucMsg = 'Successful deletion of image.';
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        });
+      } else {
+        errMsg = 'Unable to delete image: missing request body.';
+        console.log(errMsg.red);
+        res.status(400).send({
+          type    : 'bad_request',
+          message : errMsg
+        });
+      }
+    }
+  );
+
+
+  /**
    * Delete a poem
    */
   app.delete('/api/v1/user/:userId/poem/:poemId',
@@ -2088,6 +2142,7 @@ module.exports = function(app, io, clientSocketsHash) {
   //   }
   // );
 
+
   /**
    * Upload inspirational image for poem
    */
@@ -2133,13 +2188,13 @@ module.exports = function(app, io, clientSocketsHash) {
             var uploader = s3Client.uploadFile(params);
 
             uploader.on('error', function(err) {
-              errMsg = 'Unable to upload to permanent bucket.';
+              errMsg = 'Unable to upload image.';
               console.log(errMsg.red);
               return next(err);
             });
 
             uploader.on('end', function() {
-              sucMsg = 'Successful upload to permanent bucket.';
+              sucMsg = 'Successful upload of image.';
               console.log(sucMsg.blue);
               done(null, destPath);
             });
@@ -2204,13 +2259,13 @@ module.exports = function(app, io, clientSocketsHash) {
             var uploader = s3Client.uploadFile(params);
 
             uploader.on('error', function(err) {
-              errMsg = 'Unable to upload to permanent bucket.';
+              errMsg = 'Unable to upload avatar.';
               console.log(errMsg.red);
               return next(err);
             });
 
             uploader.on('end', function() {
-              sucMsg = 'Successful upload to permanent bucket.';
+              sucMsg = 'Successful upload of avatar.';
               console.log(sucMsg.blue);
               done(null, destPath);
             });
