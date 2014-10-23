@@ -15,7 +15,8 @@ var poemSchema = new Schema({
   poem     : { type: String },
   tags     : [{ type: String, trim: true }],
   comments : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
-  imageUrl : { type: String }
+  imageUrl : { type: String },
+  song     : { title: { type: String }, artist: { type: String }, link: { type: String }}
 });
 
 // plugins ---------------------------------------------------------------------

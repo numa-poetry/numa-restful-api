@@ -2039,13 +2039,16 @@ module.exports = function(app, io, clientSocketsHash) {
 
       var sucMsg;
 
-      var newPoem = new Poem({
-        creator  : req.user._id,
-        title    : req.body.title,
-        poem     : req.body.poem,
-        tags     : req.body.tags,
-        imageUrl : req.body.imageUrl
-      });
+      var newPoem         = new Poem();
+      newPoem.creator     = req.user._id;
+      newPoem.title       = req.body.title;
+      newPoem.poem        = req.body.poem;
+      newPoem.tags        = req.body.tags;
+      newPoem.imageUrl    = req.body.imageUrl;
+      newPoem.song.artist = req.body.songArtist;
+      newPoem.song.title  = req.body.songTitle;
+      newPoem.song.link   = req.body.songLink;
+
 
       newPoem.save(function(err, poem) {
         if (err) {
