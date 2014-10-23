@@ -1056,7 +1056,7 @@ module.exports = function(app, io, clientSocketsHash) {
       var poemQuery, pageNumber, searchBy, errMsg, sucMsg, caseInsensitiveRegex, query = {};
 
       poemQuery  = req.query.query || null;
-      pageNumber = req.query.page || 1;
+      req.query.page > 0 ? pageNumber = req.query.page : pageNumber = 1;
 
       if (typeof req.query.searchby === 'undefined') {
         searchBy = 'title';
@@ -1302,10 +1302,10 @@ module.exports = function(app, io, clientSocketsHash) {
       // Verify userId matches poem's creator Id
 
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
-        'title'    : req.body.title,
-        'poem'     : req.body.poem,
-        'tags'     : req.body.tags,
-        'imageUrl' : req.body.imageUrl || ""
+        'title'                 : req.body.title,
+        'poem'                  : req.body.poem,
+        'tags'                  : req.body.tags,
+        'inspirations.imageUrl' : req.body.imageUrl || ""
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
@@ -1454,7 +1454,7 @@ module.exports = function(app, io, clientSocketsHash) {
 
           Poem.findByIdAndUpdate(poemId, {
             '$unset': {
-              imageUrl: ""
+              'inspirations.imageUrl': ""
             }
           }, function(err) {
             if (err) {
@@ -2039,16 +2039,21 @@ module.exports = function(app, io, clientSocketsHash) {
 
       var sucMsg;
 
-      var newPoem         = new Poem();
-      newPoem.creator     = req.user._id;
-      newPoem.title       = req.body.title;
-      newPoem.poem        = req.body.poem;
-      newPoem.tags        = req.body.tags;
-      newPoem.imageUrl    = req.body.imageUrl;
-      newPoem.song.artist = req.body.songArtist;
-      newPoem.song.title  = req.body.songTitle;
-      newPoem.song.link   = req.body.songLink;
+      var newPoem           = new Poem();
+      newPoem.creator       = req.user._id;
+      newPoem.title         = req.body.title;
+      newPoem.poem          = req.body.poem;
+      newPoem.tags          = req.body.tags;
 
+      var inspirations      = {};
+      var song              = {};
+      inspirations.imageUrl = req.body.imageUrl || null;
+      inspirations.videoUrl = req.body.videoUrl || null;
+      song.artist           = req.body.songArtist || null;
+      song.title            = req.body.songTitle || null;
+      song.url              = req.body.songUrl || null;
+      inspirations.song     = song;
+      newPoem.inspirations  = inspirations;
 
       newPoem.save(function(err, poem) {
         if (err) {

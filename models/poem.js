@@ -10,13 +10,17 @@ var Schema     = mongoose.Schema;
 
 // schema ----------------------------------------------------------------------
 var poemSchema = new Schema({
-  creator  : { type: Schema.Types.ObjectId, ref: 'User' },
-  title    : { type: String },
-  poem     : { type: String },
-  tags     : [{ type: String, trim: true }],
-  comments : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
-  imageUrl : { type: String },
-  song     : { title: { type: String }, artist: { type: String }, link: { type: String }}
+  creator      : { type: Schema.Types.ObjectId, ref: 'User' },
+  title        : { type: String },
+  poem         : { type: String },
+  tags         : [{ type: String, trim: true }],
+  comments     : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
+  inspirations : {
+    text     : { type: String },
+    imageUrl : { type: String },
+    song     : { title: { type: String }, artist: { type: String }, url: { type: String }},
+    videoUrl : { type: String }
+  }
 });
 
 // plugins ---------------------------------------------------------------------
