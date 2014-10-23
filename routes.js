@@ -1302,9 +1302,10 @@ module.exports = function(app, io, clientSocketsHash) {
       // Verify userId matches poem's creator Id
 
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
-        'title' : req.body.title,
-        'poem'  : req.body.poem,
-        'tags'  : req.body.tags
+        'title'    : req.body.title,
+        'poem'     : req.body.poem,
+        'tags'     : req.body.tags,
+        'imageUrl' : req.body.imageUrl || ""
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
@@ -1416,15 +1417,15 @@ module.exports = function(app, io, clientSocketsHash) {
   /**
    * Delete inspirational image from poem
    */
-  app.delete('/api/v1/user/:id/poemimage',
+  app.delete('/api/v1/user/:userId/poem/:poemId/image',
     ensureAuthenticated,
     function(req, res, next) {
-      console.log('\n[DELETE] /api/v1/user/:id/poem/image'.bold.green);
+      console.log('\n[DELETE] /api/v1/user/:userId/poem/:poemId/image'.bold.green);
       console.log('Request body:'.green, req.body);
 
       if (req.body.imageUrl) {
         var remoteImage = req.body.imageUrl.split(".com/").pop();
-
+        var poemId = hashids.decryptHex(req.params.poemId);
         var errMsg, sucMsg;
 
         var s3Params = {
@@ -1450,9 +1451,20 @@ module.exports = function(app, io, clientSocketsHash) {
         deleter.on('end', function() {
           sucMsg = 'Successful deletion of image.';
           console.log(sucMsg.blue);
-          res.status(200).send({
-            type    : 'success',
-            message : sucMsg
+
+          Poem.findByIdAndUpdate(poemId, {
+            '$unset': {
+              imageUrl: ""
+            }
+          }, function(err) {
+            if (err) {
+              console.log(err);
+            } else {
+              res.status(200).send({
+                type    : 'success',
+                message : sucMsg
+              });
+            }
           });
         });
       } else {
