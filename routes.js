@@ -67,6 +67,31 @@ module.exports = function(app, io, clientSocketsHash) {
     return 0;
   }
 
+  function extractDomain(url) {
+    return url.split('/')[2] || url.split('/')[0];
+  }
+
+  function youtubeIdParser(url) {
+    var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+    var match = url.match(regExp);
+    if (match && match[1].length == 11){
+        return match[1];
+    } else {
+      console.log('error parsing YouTube url');
+      return 1;
+    }
+  }
+
+  function vimeoIdParser(url) {
+    // look for a string with 'vimeo', then whatever, then a forward slash, and a group of digits.
+    var match = /vimeo.*\/(\d+)/i.exec(url);
+    if (match) {
+      return match[1];
+    } else {
+      return 1;
+    }
+  }
+
   function createToken(stayLoggedIn, user, req) {
     var expires, payload;
 
@@ -1302,10 +1327,14 @@ module.exports = function(app, io, clientSocketsHash) {
       // Verify userId matches poem's creator Id
 
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
-        'title'                 : req.body.title,
-        'poem'                  : req.body.poem,
-        'tags'                  : req.body.tags,
-        'inspirations.imageUrl' : req.body.imageUrl || ""
+        'title'                    : req.body.title,
+        'poem'                     : req.body.poem,
+        'tags'                     : req.body.tags || '',
+        // 'inspirations.song.artist' : req.body.songArtist || '',
+        // 'inspirations.song.title'  : req.body.songTitle || '',
+        // 'inspirations.song.url'    : req.body.songUrl || '',
+        'inspirations.imageUrl'    : req.body.imageUrl || '',
+        'inspirations.videoUrl'    : req.body.videoUrl || ''
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
@@ -2037,7 +2066,7 @@ module.exports = function(app, io, clientSocketsHash) {
       console.log('\n[POST] /api/v1/user/:id/poem'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      var sucMsg;
+      var sucMsg, errMsg;
 
       var newPoem           = new Poem();
       newPoem.creator       = req.user._id;
@@ -2046,13 +2075,27 @@ module.exports = function(app, io, clientSocketsHash) {
       newPoem.tags          = req.body.tags;
 
       var inspirations      = {};
-      var song              = {};
-      inspirations.imageUrl = req.body.imageUrl || null;
-      inspirations.videoUrl = req.body.videoUrl || null;
-      song.artist           = req.body.songArtist || null;
-      song.title            = req.body.songTitle || null;
-      song.url              = req.body.songUrl || null;
-      inspirations.song     = song;
+      // var song              = {};
+
+      var videoUrl = req.body.videoUrl;
+      if (videoUrl) {
+        var domain = extractDomain(videoUrl);
+        if (domain === 'www.youtube.com' || domain === 'youtube.com') {
+          // https://www.youtube.com/watch?v=zhMww7b3Ha4 => https://www.youtube.com/v/zhMww7b3Ha4
+          inspirations.videoUrl = 'https://www.youtube.com/v/' + youtubeIdParser(videoUrl);
+        } else if (domain === 'www.vimeo.com' || domain === 'vimeo.com') {
+          // http://vimeo.com/98374747 => https://player.vimeo.com/video/98374747
+          inspirations.videoUrl = 'https://player.vimeo.com/video/' + vimeoIdParser(videoUrl);
+        } else {
+          console.log('video url\'s domain not supported:', domain);
+        }
+      }
+
+      inspirations.imageUrl = req.body.imageUrl;
+      // song.artist           = req.body.songArtist;
+      // song.title            = req.body.songTitle;
+      // song.url              = req.body.songUrl;
+      // inspirations.song     = song;
       newPoem.inspirations  = inspirations;
 
       newPoem.save(function(err, poem) {
@@ -2071,14 +2114,14 @@ module.exports = function(app, io, clientSocketsHash) {
               res.message = 'The user could not be found and updated.';
               return next(err);
             } else if (!user) {
-              var errMsg = 'The user could not be found and updated.';
+              errMsg = 'The user could not be found and updated.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
                 message : errMsg
               });
             } else {
-              var sucMsg = 'The poem was saved.';
+              sucMsg = 'The poem was saved.';
               console.log(sucMsg.blue);
               res.status(200).send({
                 type    : 'success',

@@ -18,7 +18,7 @@ var poemSchema = new Schema({
   inspirations : {
     text     : { type: String },
     imageUrl : { type: String },
-    song     : { title: { type: String }, artist: { type: String }, url: { type: String }},
+    // song     : { title: { type: String }, artist: { type: String }, url: { type: String }},
     videoUrl : { type: String }
   }
 });
