@@ -33,10 +33,7 @@ var s3Client = s3.createClient({
 });
 
 // routes ----------------------------------------------------------------------
-module.exports = function(app, io, clientSocketsHash) {
-
-  // Hash of MongoDB _ids to socket ids
-  var loggedInClientsHash = {};
+module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
 
   function encrypt(text) {
     var cipher        = crypto.createCipher(auth.ENCRYPTION_KEY, auth.ENCRYPTION_ALGO);
@@ -219,6 +216,32 @@ module.exports = function(app, io, clientSocketsHash) {
       });
     }
   );
+
+
+  app.get('/socket/:id',
+    function(req, res, next) {
+      console.log('\n[GET] /socket/:id'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      console.log('client hash', clientSocketsHash);
+      console.log('log clients:', loggedInClientsHash);
+
+      var socket = clientSocketsHash[loggedInClientsHash[req.params.id+'']];
+      if (socket !== undefined) {
+        console.log('emitting TEST event');
+        socket.emit('TEST', { test : 'THIS IS A TEST THINGY' });
+
+        sucMsg = 'The socket should have emitted something';
+        res.status(200).send({ message : sucMsg });
+      } else {
+        errMsg = 'client socket id is undefined';
+        console.log(errMsg);
+        res.status(400).send({ message : errMsg});
+      }
+    });
+
+
 
   /**
    * Local signup
@@ -1916,22 +1939,40 @@ module.exports = function(app, io, clientSocketsHash) {
           console.log(sucMsg.blue);
 
           // When a new comment is saved, push a notification to the creator if he is logged in
-          var socket = clientSocketsHash[loggedInClientsHash[creatorId]];
-          if (socket !== undefined) {
-            console.log('emitting newComment event');
-            socket.emit('newComment', { poemId: poemId });
-          }
+          // console.log('creatorId', creatorId);
+          // console.log('creatorId type:', typeof(creatorId));
+          // console.log('loggedInClientsHash', loggedInClientsHash);
+          // console.log('clientSocketsHash', clientSocketsHash);
+          // console.log('loggedInClientsHash[creatorId]', loggedInClientsHash[creatorId+""]);
+          // console.log('clientSocketsHash[loggedInClientsHash[creatorId]]', clientSocketsHash[loggedInClientsHash[creatorId]]);
 
-          res.status(200).send({
-            type      : 'success',
-            message   : sucMsg,
-            commentId : hashids.encryptHex(commentId),
-            creatorId : hashids.encryptHex(creatorId)
-          });
+          // var socket = clientSocketsHash[loggedInClientsHash[creatorId]];
+          // if (socket !== undefined) {
+          //   // emitNewCommentEvent(socket, res);
+          //   console.log('emitting newComment event');
+          //   // socket.emit('newComment', { poemId: poemId });
+          //   socket.emit('newComment', { test : '!'});
+          //   res.status(200).send({
+          //     type      : 'success',
+          //     message   : sucMsg,
+          //     commentId : hashids.encryptHex(commentId),
+          //     creatorId : hashids.encryptHex(creatorId)
+          //   });
+          // } else {
+            // console.log('socket was undefined');
+            res.status(200).send({
+              type      : 'success',
+              message   : sucMsg,
+              commentId : hashids.encryptHex(commentId),
+              creatorId : hashids.encryptHex(creatorId)
+            });
+          // }
         }
       });
     }
   );
+
+
 
   /**
    * Get poem status (favorited or not)

@@ -17,10 +17,13 @@ try {
   var PrettyError  = require('pretty-error');
   var cool         = require('cool-ascii-faces');
   var superb       = require('superb');
+  var Hashids      = require('hashids');
   var io           = require('socket.io')(server);
   var auth         = require('./config/auth.js');
 
   var port         = process.env.PORT || 3000;
+
+  var hashids      = new Hashids(auth.HASHIDS_SALT);
 
 // db config -------------------------------------------------------------------
   mongoose.connect(auth.CONNECTION_URI);
@@ -85,18 +88,24 @@ try {
   // hash of socket ids to sockets
   var clientSocketsHash = {};
 
+  // Hash of MongoDB _ids to socket ids
+  var loggedInClientsHash = {};
+
   io.on('connection', function(socket) {
     console.log('\nsocket connection with ' + socket.id);
     clientSocketsHash[socket.id] = socket;
-    console.log('connected clients:', Object.keys(clientSocketsHash));
+    console.log('total connected clients:', Object.keys(clientSocketsHash));
 
-    // emit socket id to client
-    socket.emit('socketId', { id : socket.id });
+// events ----------------------------------------------------------------------
+    socket.emit('newSocketId', { id : socket.id });
 
-    // socket.emit('news', { hello: 'world' });
-    // socket.on('my other event', function(data) {
-    //   console.log(data);
-    // });
+    socket.on('newComment', function(data) {
+      console.log('on newComment event..', data);
+      var creatorId = hashids.decryptHex(data.creatorId);
+      var creatorSocket = clientSocketsHash[loggedInClientsHash[creatorId]];
+      creatorSocket.emit('newComment', { msg : 'Someone wrote you bitch!' });
+    });
+
     socket.on('disconnect', function() {
       console.log('\nsocket disconnection with ' + socket.id);
       delete clientSocketsHash[socket.id];
@@ -104,7 +113,7 @@ try {
   });
 
 // routes ----------------------------------------------------------------------
-  require('./routes.js')(app, io, clientSocketsHash);
+  require('./routes.js')(app, io, clientSocketsHash, loggedInClientsHash);
 
 // run server ------------------------------------------------------------------
   server.listen(port, function() {
