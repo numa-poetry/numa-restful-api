@@ -30,8 +30,9 @@ var userSchema = new Schema({
   resetPasswordExpires : { type: Date },
 
   poems                : [{ type: Schema.Types.ObjectId, ref: 'Poem' }],
-  comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
   favoritePoems        : [{ type: Schema.Types.ObjectId, ref: 'Poem' }],
+  comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
+  unreadComments       : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
   followers            : [{ type: Schema.Types.ObjectId, ref: 'User' }],
   following            : [{ type: Schema.Types.ObjectId, ref: 'User' }]
 });

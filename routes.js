@@ -89,6 +89,26 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     }
   }
 
+  function startSocketSession(req, userId) {
+    if (req.headers.socketid) {
+      console.log('(startSocketSession) logging in client:', userId);
+      loggedInClientsHash[userId] = req.headers.socketid;
+      console.log('(startSocketSession) total logged in clients:', Object.keys(loggedInClientsHash));
+      console.log('(startSocketSession) total connected clients:', Object.keys(clientSocketsHash));
+    } else {
+      console.log('(startSocketSession) no socket id found in request header.');
+    }
+  }
+
+  function endSocketSession(req, userId) {
+    if (req.headers.socketid) {
+      console.log('(endSocketSession) logging out client:', userId);
+      delete loggedInClientsHash[userId];
+      console.log('(endSocketSession) total logged in clients:', Object.keys(loggedInClientsHash));
+      console.log('(endSocketSession) total connected clients:', Object.keys(clientSocketsHash));
+    }
+  }
+
   function createToken(stayLoggedIn, user, req) {
     var expires, payload;
 
@@ -153,6 +173,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             } else if (payload.exp <= Date.now()) {
               errMsg = 'The user\'s session token has expired.';
               console.log(errMsg.red);
+
+              endSocketSession(req, hashids.decryptHex(userId));
+
               res.status(498).send({
                 type    : 'token_expired',
                 message : errMsg
@@ -217,7 +240,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     }
   );
 
-
   app.get('/socket/:id',
     function(req, res, next) {
       console.log('\n[GET] /socket/:id'.bold.green);
@@ -240,7 +262,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         res.status(400).send({ message : errMsg});
       }
     });
-
 
 
   /**
@@ -286,6 +307,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               delete newUser.password;
               var token = createToken(req.body.stayLoggedIn, newUser, req);
 
+              startSocketSession(req, newUser._id);
+
               res.status(201).send({
                 type  : 'success',
                 id    : hashids.encryptHex(newUser._id),
@@ -320,10 +343,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             delete user.password;
             var token = createToken(req.body.stayLoggedIn, user, req);
 
-            if (req.headers.socketid) {
-              loggedInClientsHash[user._id + ''] = req.headers.socketid;
-              console.log('logged in clients:', Object.keys(loggedInClientsHash));
-            }
+            startSocketSession(req, user._id);
 
             res.status(201).send({
               type  : 'success',
@@ -375,11 +395,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('\n[GET] /api/v1/user/:id/logout'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      if (req.headers.socketid) {
-        console.log('Logging out client');
-        delete loggedInClientsHash[req.user._id + ''];
-        console.log('logged in clients:', Object.keys(loggedInClientsHash));
-      }
+      var userId = req.params.id;
+
+      endSocketSession(req, hashids.decryptHex(userId));
 
       res.status(200).send({
         type    : 'success',
@@ -638,6 +656,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                         return next(err);
                       } else {
                         var token = createToken(true, user, req);
+
+                        startSocketSession(req, user._id);
+
                         res.status(200).send({
                           id          : hashids.encryptHex(user._id),
                           token       : token,
@@ -657,6 +678,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(true, existingUser, req);
+
+                startSocketSession(req, existingUser._id);
+
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -675,6 +699,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                     return next(err);
                   } else {
                     var token = createToken(true, newUser, req);
+
+                    startSocketSession(req, newUser._id);
+
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -738,6 +765,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                         return next(err);
                       } else {
                         var token = createToken(true, user, req);
+
+                        startSocketSession(req, user._id);
+
                         res.status(200).send({
                           id          : hashids.encryptHex(user._id),
                           token       : token,
@@ -757,6 +787,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               if (existingUser) {
                 console.log('3b existing user');
                 var token = createToken(true, existingUser, req);
+
+                startSocketSession(req, existingUser._id);
+
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -775,6 +808,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                     return next(err);
                   } else {
                     var token = createToken(true, newUser, req);
+
+                    startSocketSession(req, newUser._id);
+
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -839,6 +875,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                       return next(err);
                     } else {
                       var token = createToken(true, user, req);
+
+                      startSocketSession(req, user._id);
+
                       res.status(200).send({
                         id          : hashids.encryptHex(user._id),
                         token       : token,
@@ -857,6 +896,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               if (existingUser) {
                 console.log('3b existingUser');
                 var token = createToken(true, existingUser, req);
+
+                startSocketSession(req, existingUser._id);
+
                 res.status(200).send({
                   id          : hashids.encryptHex(existingUser._id),
                   token       : token,
@@ -882,6 +924,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                     return next(err);
                   } else {
                     var token = createToken(true, newUser, req);
+
+                    startSocketSession(req, newUser._id);
+
                     res.status(201).send({
                       id          : hashids.encryptHex(newUser._id),
                       token       : token,
@@ -921,12 +966,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             message : errMsg
           });
         } else {
-          var resObj         = {};
-          resObj.id          = hashids.encryptHex(user._id);
-          resObj.displayName = user.local.displayName || user.displayName;
-          resObj.createdAt   = user.createdAt;
-          resObj.email       = user.email;
-          resObj.avatarUrl   = user.avatarUrl;
+          var resObj                 = {};
+          resObj.id                  = hashids.encryptHex(user._id);
+          resObj.displayName         = user.local.displayName || user.displayName;
+          resObj.createdAt           = user.createdAt;
+          resObj.email               = user.email;
+          resObj.avatarUrl           = user.avatarUrl;
+          resObj.unreadCommentsCount = user.unreadComments.length || 0;
 
           if (req.query.profile === 'full') {
 
@@ -974,6 +1020,29 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                   },
                   function(err) {
                     resObj.comments = comments;
+                    done(null, resObj);
+                  }
+                );
+              },
+              function(resObj, done) {
+                var unreadComments = [];
+                async.each(user.unreadComments,
+                  function(id, callback) {
+                    Comment.findById(id).populate('poem').exec(function(err, comment) {
+                      if (comment) {
+                        var unreadCommentObj       = {};
+                        unreadCommentObj.id        = hashids.encryptHex(comment._id),
+                        unreadCommentObj.comment   = comment.comment;
+                        unreadCommentObj.createdAt = comment.createdAt;
+                        unreadCommentObj.poemId    = hashids.encryptHex(comment.poem._id);
+                        unreadCommentObj.poemTitle = comment.poem.title;
+                        unreadComments.push(unreadCommentObj);
+                        callback();
+                      }
+                    });
+                  },
+                  function(err) {
+                    resObj.unreadComments = unreadComments;
                     done(null, resObj);
                   }
                 );
@@ -1305,13 +1374,14 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               // Sort comments by createdAt in descending order
               comments.sort(compareTimestampsDesc);
 
-              var creator         = {};
-              creator.id          = hashids.encryptHex(user._id);
-              creator.displayName = user.displayName || user.local.displayName;
-              creator.avatarUrl   = user.avatarUrl;
-              poem                = poem.toObject();
-              poem.positiveVotes  = poem.vote.positive.length;
-              poem.negativeVotes  = poem.vote.negative.length;
+              var creator            = {};
+              creator.id             = hashids.encryptHex(user._id);
+              creator.displayName    = user.displayName || user.local.displayName;
+              creator.avatarUrl      = user.avatarUrl;
+              creator.unreadComments = user.unreadComments;
+              poem                   = poem.toObject();
+              poem.positiveVotes     = poem.vote.positive.length;
+              poem.negativeVotes     = poem.vote.negative.length;
 
               delete poem._id;
               delete poem.__v;
@@ -1322,9 +1392,52 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               resObj.poem          = poem;
               resObj.poem.creator  = creator;
               resObj.poem.comments = comments;
-              done(null, resObj);
+              done(null, resObj, user._id);
             }
           );
+        },
+        function(resObj, creatorId, done) {
+          if (!req.headers.authorization) {
+            console.log('no token in header');
+            done(null, resObj);
+          } else {
+            var token = req.headers.authorization.split(' ')[1];
+            var payload = jwt.decode(token, auth.TOKEN_SECRET);
+            if (payload.sub == hashids.encryptHex(creatorId)) {
+              console.log('The creator is requesting.');
+
+              // Remove each unreadComment of this poem from creator's unreadComments[]
+              var unreadComments = resObj.poem.creator.unreadComments;
+              if (unreadComments !== undefined && unreadComments.length > 0) {
+                console.log('Unread comments, so removing...', unreadComments);
+                async.each(unreadComments,
+                  function(commentId, callback) {
+                    Comment.findById(commentId).populate('poem').exec(function(err, comment) {
+                      if (poemId == comment.poem._id) {
+                        User.findByIdAndUpdate(creatorId, {
+                          '$pull': {
+                            unreadComments: commentId
+                          }
+                        }, function(err, user) {
+                          callback();
+                        });
+                      }
+                    });
+                  },
+                  function(err) {
+                    done(null, resObj);
+                  }
+                );
+              } else {
+                console.log('No unread comments');
+                done(null, resObj);
+              }
+            } else {
+              console.log('The creator isn\'t requesting.');
+              done(null, resObj);
+            }
+          }
+
         }
       ], function(err, resObj) {
         if (err) {
@@ -1938,41 +2051,43 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           sucMsg = 'The comment was saved.';
           console.log(sucMsg.blue);
 
-          // When a new comment is saved, push a notification to the creator if he is logged in
-          // console.log('creatorId', creatorId);
-          // console.log('creatorId type:', typeof(creatorId));
-          // console.log('loggedInClientsHash', loggedInClientsHash);
-          // console.log('clientSocketsHash', clientSocketsHash);
-          // console.log('loggedInClientsHash[creatorId]', loggedInClientsHash[creatorId+""]);
-          // console.log('clientSocketsHash[loggedInClientsHash[creatorId]]', clientSocketsHash[loggedInClientsHash[creatorId]]);
-
-          // var socket = clientSocketsHash[loggedInClientsHash[creatorId]];
-          // if (socket !== undefined) {
-          //   // emitNewCommentEvent(socket, res);
-          //   console.log('emitting newComment event');
-          //   // socket.emit('newComment', { poemId: poemId });
-          //   socket.emit('newComment', { test : '!'});
-          //   res.status(200).send({
-          //     type      : 'success',
-          //     message   : sucMsg,
-          //     commentId : hashids.encryptHex(commentId),
-          //     creatorId : hashids.encryptHex(creatorId)
-          //   });
-          // } else {
-            // console.log('socket was undefined');
+          // When a new comment is saved, push a notification to the creator if logged in
+          // and add comment ref to User's unreadComments[]
+          // remove unread comment(s) from [] when creator gets the comment(s)' poem
+          if (req.user._id+'' != creatorId+'') {
+            User.findByIdAndUpdate(creatorId, {
+              '$addToSet': {
+                unreadComments : commentId
+              }
+            },
+            function(err, user) {
+              var socket = clientSocketsHash[loggedInClientsHash[creatorId]];
+              if (socket !== undefined) {
+                console.log('emitting newComment event');
+                socket.emit('newComment', { msg : 'Someone wrote you a new comment!' });
+                res.status(200).send({
+                  type      : 'success',
+                  message   : sucMsg,
+                  commentId : hashids.encryptHex(commentId),
+                  creatorId : hashids.encryptHex(creatorId)
+                });
+              } else {
+                console.log('socket is undefined so moving on...');
+              }
+            });
+          } else {
+            console.log('Creator so not adding to unreadComments[]');
             res.status(200).send({
               type      : 'success',
               message   : sucMsg,
               commentId : hashids.encryptHex(commentId),
               creatorId : hashids.encryptHex(creatorId)
             });
-          // }
+          }
         }
       });
     }
   );
-
-
 
   /**
    * Get poem status (favorited or not)
