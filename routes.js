@@ -1525,7 +1525,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                 message : errMsg
               });
             } else if ((comment.poem.creator == req.user._id + '') || (comment.creator == req.user._id + '')) {
-              done(null);
+              done(null, comment.poem.creator);
             } else {
               errMsg = 'The requesting user is not the poem\'s creator.';
               console.log(errMsg.red);
@@ -1536,36 +1536,42 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             }
           });
         },
-        function(done) {
+        function(creatorId, done) {
           // Delete comment
           Comment.findByIdAndRemove(commentId, function(err, comment) {
             if (comment) {
-              done(null, comment);
+              done(null, comment, creatorId);
             }
           });
         },
-        function(comment, done) {
+        function(comment, creatorId, done) {
           // Delete comment ref from user
           User.findByIdAndUpdate(comment.creator, {
             '$pull': {
               comments: comment._id
             }
           }, function(err, user) {
-            if (user) {
-              done(null, comment, user);
-            }
+            done(null, comment, creatorId);
           });
         },
-        function(comment, user, done) {
+        function(comment, creatorId, done) {
           // Delete comment ref from poem
           Poem.findByIdAndUpdate(comment.poem, {
             '$pull': {
               comments: comment._id
             }
           }, function(err, poem) {
-            if (poem) {
-              done(null);
+            done(null, comment._id, creatorId);
+          });
+        },
+        function(commentId, creatorId, done) {
+          // Delete comment ref from poem creator's unread comments
+          User.findByIdAndUpdate(creatorId, {
+            '$pull': {
+              unreadComments : commentId
             }
+          }, function(err, user) {
+            done(null);
           });
         }
       ], function() {
@@ -2065,15 +2071,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               if (socket !== undefined) {
                 console.log('emitting newComment event');
                 socket.emit('newComment', { msg : 'Someone wrote you a new comment!' });
-                res.status(200).send({
-                  type      : 'success',
-                  message   : sucMsg,
-                  commentId : hashids.encryptHex(commentId),
-                  creatorId : hashids.encryptHex(creatorId)
-                });
-              } else {
-                console.log('socket is undefined so moving on...');
               }
+              res.status(200).send({
+                type      : 'success',
+                message   : sucMsg,
+                commentId : hashids.encryptHex(commentId),
+                creatorId : hashids.encryptHex(creatorId)
+              });
             });
           } else {
             console.log('Creator so not adding to unreadComments[]');
