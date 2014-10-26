@@ -56,12 +56,6 @@ try {
   if (app.get('env') === 'production') {
     message = 'Running in production mode';
     console.log(message.yellow);
-
-    // Force HTTPS
-    // app.use(function(req, res, next) {
-    //   var protocol = req.get('x-forwarded-proto');
-    //   protocol == 'https' ? next() : res.redirect('https://' + req.hostname + req.url);
-    // });
     app.use(errorhandler({
       dumpExceptions : true,
       showStack      : true
@@ -92,7 +86,6 @@ try {
   var loggedInClientsHash = {};
 
   io.on('connection', function(socket) {
-    // console.log('\nsocket connection with ' + socket.id);
     clientSocketsHash[socket.id] = socket;
     console.log('(connection) total connected clients:', Object.keys(clientSocketsHash));
     console.log('(connection) total logged in clients:', Object.keys(loggedInClientsHash));
@@ -100,18 +93,10 @@ try {
 // events ----------------------------------------------------------------------
     socket.emit('newSocketId', { id : socket.id });
 
-    // socket.on('newComment', function(data) {
-    //   console.log('on newComment event..', data);
-    //   var creatorId = hashids.decryptHex(data.creatorId);
-    //   var creatorSocket = clientSocketsHash[loggedInClientsHash[creatorId]];
-    //   creatorSocket.emit('newComment', { msg : 'Someone wrote you bitch!' });
-    // });
-
     socket.on('disconnect', function() {
       delete clientSocketsHash[socket.id];
       console.log('(disconnection) total connected clients:', Object.keys(clientSocketsHash));
       console.log('(disconnection) total logged in clients:', Object.keys(loggedInClientsHash));
-      // console.log('\nsocket disconnection with ' + socket.id);
     });
   });
 

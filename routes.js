@@ -500,6 +500,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('\n[GET] /api/v1/reset/:token'.bold.green);
       console.log('Request body:'.green, req.body);
 
+      var errMsg, sucMsg;
+
       User.findOne({
         resetPasswordToken   : req.params.token,
         resetPasswordExpires : {
@@ -510,14 +512,14 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           res.message = 'The user could not be verified.';
           return next(err);
         } else if (!user) {
-          var errMsg = 'No account with that email address exists.';
+          errMsg = 'No account with that email address exists.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
             message : errMsg
           });
         } else {
-          var sucMsg = 'The user exists.';
+          sucMsg = 'The user exists.';
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -532,6 +534,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('\n[POST] /api/v1/reset/:token'.bold.green);
       console.log('Request body:'.green, req.body);
 
+      var errMsg, sucMsg;
+
       async.waterfall([
         function(done) {
           User.findOne({
@@ -544,7 +548,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               res.message = 'The user could not be verified.';
               return next(err);
             } else if (!user) {
-              var errMsg = 'The user account doesn\'t exist.';
+              errMsg = 'The user account doesn\'t exist.';
               console.log(errMsg.red);
               res.status(404).send({
                 type    : 'not_found',
@@ -560,7 +564,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                   res.message = 'The user\'s password could not be updated.';
                   return next(err);
                 } else {
-                  var sucMsg = 'The user\'s password has been updated successfully.';
+                  sucMsg = 'The user\'s password has been updated successfully.';
                   console.log(sucMsg.green);
                   done(err, user);
                 }
@@ -598,7 +602,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           res.message = 'Could not send changed password confirmation email.';
           return next(err);
         } else {
-          var sucMsg = 'A changed password confirmation email has been sent to ' + user.email + '.';
+          sucMsg = 'A changed password confirmation email has been sent to ' + user.email + '.';
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -975,10 +979,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           resObj.unreadCommentsCount = user.unreadComments.length || 0;
 
           if (req.query.profile === 'full') {
-
             // gather user poem titles and user comments
             var poems = [];
-
             async.waterfall([
               function(done) {
                 async.each(user.poems,
@@ -1096,22 +1098,24 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('\n[PUT] /api/v1/user/:id'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      // req.user retrieved from ensureAuthenticated() middleware
-      User.findByIdAndUpdate(req.user._id, {
+      var errMsg, sucMsg;
+      var userId = req.user._id;
+
+      User.findByIdAndUpdate(userId, {
         'email' : req.body.email || user.email
       }, function(err, user) {
         if (err) {
           res.message = 'The user could not be found.';
           return next(err);
         } else if (!user) {
-          var errMsg = 'The user could not be found.';
+          errMsg = 'The user could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
             message : errMsg
           });
         } else {
-          var sucMsg = 'The user was updated.';
+          sucMsg = 'The user was updated.';
           console.log(sucMsg.blue);
           res.status(200).send({
             type    : 'success',
@@ -1132,8 +1136,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
+      var userId = req.user._id;
 
-      User.findByIdAndRemove(req.user._id, function(err, user) {
+      User.findByIdAndRemove(userId, function(err, user) {
         if (err) {
           res.message = 'The user could not be deleted.';
           return next(err);
@@ -1463,14 +1468,11 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       // Verify userId matches poem's creator Id
 
       Poem.findByIdAndUpdate(hashids.decryptHex(req.params.poemId), {
-        'title'                    : req.body.title,
-        'poem'                     : req.body.poem,
-        'tags'                     : req.body.tags || '',
-        // 'inspirations.song.artist' : req.body.songArtist || '',
-        // 'inspirations.song.title'  : req.body.songTitle || '',
-        // 'inspirations.song.url'    : req.body.songUrl || '',
-        'inspirations.imageUrl'    : req.body.imageUrl || '',
-        'inspirations.videoUrl'    : req.body.videoUrl || ''
+        'title'                 : req.body.title,
+        'poem'                  : req.body.poem,
+        'tags'                  : req.body.tags || '',
+        'inspirations.imageUrl' : req.body.imageUrl || '',
+        'inspirations.videoUrl' : req.body.videoUrl || ''
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
@@ -1507,9 +1509,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       var userId    = hashids.decryptHex(req.params.userId);
       var poemId    = hashids.decryptHex(req.params.poemId);
       var commentId = hashids.decryptHex(req.params.commentId);
-      // console.log('userid:', userId);
-      // console.log('poemid:', poemId);
-      // console.log('commentid:', commentId);
 
       async.waterfall([
         function(done) {
@@ -1679,9 +1678,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             } else if (poem.creator == req.user._id + '') {
               done(null);
             } else {
-              // userId doesn't match poem's creator id
-              // console.log(poem.creator);
-              // console.log(req.user._id);
               errMsg = 'The requesting user is not the poem\'s creator.';
               console.log(errMsg.red);
               res.status(401).send({
@@ -1694,53 +1690,28 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         function(done) {
           // Delete poem
           Poem.findByIdAndRemove(poemId, function(err, poem) {
-            // if (err) {
-            //   res.message = 'The poem could not be deleted.';
-            //   return next(err);
-            // } else if (!poem) {
-            //   errMsg = 'The poem could not be found.';
-            //   console.log(errMsg.red);
-            //   res.status(404).send({
-            //     type    : 'not_found',
-            //     message : errMsg
-            //   });
-            // } else {
+            if (poem) {
               done(null, poem);
-            // }
+            }
           });
         },
         function(poem, done) {
-          // Delete poem reference from user
+          // Delete poem reference from creator
           User.findByIdAndUpdate(poem.creator, {
             '$pull': {
               poems: poem._id
             }
           }, function(err, user) {
-            // if (err) {
-            //   res.message = 'The user could not be found and updated.';
-            //   return next(err);
-            // } else if (!user) {
-            //   var errMsg = 'The user could not be found and updated.';
-            //   console.log(errMsg.red);
-            //   res.status(404).send({
-            //     type    : 'not_found',
-            //     message : errMsg
-            //   });
-            // } else {
-              done(null, poem);
-            // }
+            done(null, poem);
           });
         },
         function(poem, done) {
-          // Delete poem comments from poem; iterate through poem.comments and for each
+          // Delete comments from poem; iterate through poem.comments and for each
           // find user by id and $pull poem reference from user.poems
           async.each(poem.comments,
             function(commentId, callback) {
-              // Delete poem comment
               Comment.findByIdAndRemove(commentId, function(err, comment) {
                 if (comment) {
-                  console.log('there was a comment');
-                  // Delete poem comment reference from user
                   User.findByIdAndUpdate(comment.creator, {
                     '$pull': {
                       comments: commentId
@@ -1776,39 +1747,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       });
     }
   );
-
-  /**
-   * Get a user's comments
-   */
-  // app.get('/api/v1/user/:id/comments',
-  //   ensureAuthenticated,
-  //   function(req, res, next) {
-  //     console.log('\n[GET] /api/v1/user/:id/comments'.bold.green);
-  //     console.log('Request body:'.green, req.body);
-
-  //     User.findById(hashids.decryptHex(req.params.id), function(err, user) {
-  //       if (err) {
-  //         res.message = 'The user could not be found.';
-  //         return next(err);
-  //       } else if (!user) {
-  //         var errMsg = 'The user could not be found.';
-  //         console.log(errMsg.red);
-  //         res.status(404).send({
-  //           type    : 'not_found',
-  //           message : errMsg
-  //         });
-  //       } else {
-  //         res.status(200).send({
-  //           id          : hashids.encryptHex(user._id),
-  //           displayName : user.local.displayName || user.displayName,
-  //           joinedDate  : user.createdAt,
-  //           email       : user.email, // privacy (don't display to others) need to return only when called by logged-in user
-  //           avatarUrl   : user.avatarUrl
-  //         });
-  //       }
-  //     });
-  //   }
-  // );
 
   /**
    * Get user's vote for a poem
@@ -1920,14 +1858,14 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
 
       var poemId = hashids.decryptHex(req.params.poemId);
       var userId = req.user._id;
-      var sucMsg;
+      var errMsg, sucMsg;
 
       Poem.findById(poemId, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
           return next(err);
         } else if (!poem) {
-          var errMsg = 'The poem could not be found.';
+          errMsg = 'The poem could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
@@ -2147,14 +2085,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           res.message = 'The poem could not be found.';
           return next(err);
         } else if (!poem) {
-          var errMsg = 'The poem could not be found.';
+          errMsg = 'The poem could not be found.';
           console.log(errMsg.red);
           res.status(404).send({
             type    : 'not_found',
             message : errMsg
           });
         } else {
-
           User.findOne({ 'favoritePoems': poemId, '_id': userId }, function(err, user) {
             if (user) {
               // Remove reference
@@ -2194,14 +2131,14 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                   res.message = 'The user could not be found and updated.';
                   return next(err);
                 } else if (!user) {
-                  var errMsg = 'The user could not be found and updated.';
+                  errMsg = 'The user could not be found and updated.';
                   console.log(errMsg.red);
                   res.status(404).send({
                     type    : 'not_found',
                     message : errMsg
                   });
                 } else {
-                  var sucMsg = 'The poem was favorited.';
+                  sucMsg = 'The poem was favorited.';
                   console.log(sucMsg.blue);
                   res.status(200).send({
                     type    : 'success',
@@ -2233,9 +2170,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       newPoem.title         = req.body.title;
       newPoem.poem          = req.body.poem;
       newPoem.tags          = req.body.tags;
-
       var inspirations      = {};
-      // var song              = {};
 
       var videoUrl = req.body.videoUrl;
       if (videoUrl) {
@@ -2252,10 +2187,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       }
 
       inspirations.imageUrl = req.body.imageUrl;
-      // song.artist           = req.body.songArtist;
-      // song.title            = req.body.songTitle;
-      // song.url              = req.body.songUrl;
-      // inspirations.song     = song;
       newPoem.inspirations  = inspirations;
 
       newPoem.save(function(err, poem) {
