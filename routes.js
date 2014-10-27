@@ -1477,7 +1477,47 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     }
   );
 
-  /*
+  /**
+   * Mark unread comment as read
+   */
+  app.delete('/api/v1/user/:userId/read/comment/:commentId/',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[DELETE] /api/v1/user/:userId/read/comment/:commentId/'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId    = req.user._id;
+      var commentId = hashids.decryptHex(req.params.commentId);
+
+      User.findByIdAndUpdate(userId, {
+        '$pull': {
+          unreadComments : commentId
+        }
+      }, function(err, user) {
+        if (err) {
+          res.message = 'Could not mark comment as read.'
+          return next(err);
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          sucMsg = 'The user has marked the comment as read.'
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
+    }
+  );
+
+  /**
    * Get poem by id
    */
   app.get('/api/v1/poem/:id',
@@ -1617,7 +1657,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               done(null, resObj);
             }
           }
-
         }
       ], function(err, resObj) {
         if (err) {
