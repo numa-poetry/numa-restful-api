@@ -485,7 +485,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           res.message = 'Could not send email to reset password.';
           return next(err);
         } else {
-          var sucMsg = 'An email has been sent to ' + user.email + ' with further instructions.';
+          sucMsg = 'An email has been sent to ' + user.email + ' with further instructions.';
           console.log(sucMsg.green);
           res.status(200).send({
             type    : 'success',
@@ -1127,6 +1127,177 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   );
 
   /**
+   * Determine if user1 is following user2
+   */
+  app.get('/api/v1/user/:id/follow/user/:followingId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/follow/user/:followingId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var followerUserId  = req.user._id;
+      var followingUserId = hashids.decryptHex(req.params.followingId);
+
+      if (followerUserId !== followingUserId) {
+
+        User.findOne({ _id: followerUserId, 'following': followingUserId },
+          function(err, user) {
+            if (user) {
+              sucMsg = 'User1 is following user2.';
+              console.log(sucMsg.blue);
+              res.status(200).send({
+                type    : 'success',
+                message : sucMsg
+              });
+            } else {
+              sucMsg = 'User1 is not following user2.';
+              console.log(sucMsg.blue);
+              res.status(200).send({
+                type    : 'success',
+                message : sucMsg
+              });
+            }
+          }
+        );
+      } else {
+        errMsg = 'The user cannot follow themselves.'
+        console.log(errMsg.red);
+        res.status(400).send({
+          type    : 'bad_request',
+          message : errMsg
+        });
+      }
+    }
+  );
+
+  /**
+   * Follow a user
+   */
+  app.post('/api/v1/user/:id/follow/user/:followingId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:id/follow/user/:followingId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var followerUserId  = req.user._id;
+      var followingUserId = hashids.decryptHex(req.params.followingId);
+
+      if (followerUserId !== followingUserId) {
+        async.waterfall([
+          function(done) {
+            // update following user
+            User.findByIdAndUpdate(followingUserId, {
+              '$addToSet': {
+                followers: followerUserId
+              }
+            }, function(err, user) {
+              if (user) {
+                done(err);
+              }
+            });
+          },
+          function(done) {
+            // update follower user
+            User.findByIdAndUpdate(followerUserId, {
+              '$addToSet': {
+                following: followingUserId
+              }
+            }, function(err, user) {
+              if (user) {
+                done(err);
+              }
+            });
+          }
+        ], function(err) {
+          if (err) {
+            res.message = 'Could not follow user.';
+            return next(err);
+          } else {
+            sucMsg = 'User1 is now following user2.'
+            console.log(sucMsg.blue);
+            res.status(200).send({
+              type    : 'success',
+              message : sucMsg
+            });
+          }
+        });
+      } else {
+        errMsg = 'The user cannot follow themselves.'
+        console.log(errMsg.red);
+        res.status(400).send({
+          type    : 'bad_request',
+          message : errMsg
+        });
+      }
+    }
+  );
+
+  /**
+   * Unfollow a user
+   */
+  app.post('/api/v1/user/:id/unfollow/user/:followingId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[POST] /api/v1/user/:id/unfollow/user/:followingId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var followerUserId  = req.user._id;
+      var followingUserId = hashids.decryptHex(req.params.followingId);
+
+      if (followerUserId !== followingUserId) {
+        async.waterfall([
+          function(done) {
+            // update following user
+            User.findByIdAndUpdate(followingUserId, {
+              '$pull': {
+                followers: followerUserId
+              }
+            }, function(err, user) {
+              if (user) {
+                done(err);
+              }
+            });
+          },
+          function(done) {
+            // update follower user
+            User.findByIdAndUpdate(followerUserId, {
+              '$pull': {
+                following: followingUserId
+              }
+            }, function(err, user) {
+              if (user) {
+                done(err);
+              }
+            });
+          }
+        ], function(err) {
+          if (err) {
+            res.message = 'Could not unfollow user.';
+            return next(err);
+          } else {
+            sucMsg = 'User1 has stopped following user2.'
+            console.log(sucMsg.blue);
+            res.status(200).send({
+              type    : 'success',
+              message : sucMsg
+            });
+          }
+        });
+      } else {
+        errMsg = 'The user cannot unfollow themselves.'
+        console.log(errMsg.red);
+        res.status(400).send({
+          type    : 'bad_request',
+          message : errMsg
+        })
+      }
+    }
+  );
+
+  /**
    * Delete a user
    */
   app.delete('/api/v1/user/:id',
@@ -1137,6 +1308,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
 
       var errMsg, sucMsg;
       var userId = req.user._id;
+
+      // DELETE POEMS
 
       User.findByIdAndRemove(userId, function(err, user) {
         if (err) {
@@ -1426,6 +1599,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                         }, function(err, user) {
                           callback();
                         });
+                      } else {
+                        callback();
                       }
                     });
                   },
