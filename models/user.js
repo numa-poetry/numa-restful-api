@@ -34,7 +34,8 @@ var userSchema = new Schema({
   comments             : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
   unreadComments       : [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
   followers            : [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  following            : [{ type: Schema.Types.ObjectId, ref: 'User' }]
+  following            : [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  unreadFollowingPoems : [{ type: Schema.Types.ObjectId, ref: 'Poem' }]
 });
 
 userSchema.virtual('isLocked').get(function() {

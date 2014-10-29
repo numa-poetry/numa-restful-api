@@ -970,13 +970,15 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             message : errMsg
           });
         } else {
-          var resObj                 = {};
-          resObj.id                  = hashids.encryptHex(user._id);
-          resObj.displayName         = user.local.displayName || user.displayName;
-          resObj.createdAt           = user.createdAt;
-          resObj.email               = user.email;
-          resObj.avatarUrl           = user.avatarUrl;
-          resObj.unreadCommentsCount = user.unreadComments.length || 0;
+          var resObj                       = {};
+          resObj.id                        = hashids.encryptHex(user._id);
+          resObj.displayName               = user.local.displayName || user.displayName;
+          resObj.createdAt                 = user.createdAt;
+          resObj.email                     = user.email;
+          resObj.avatarUrl                 = user.avatarUrl;
+          resObj.followersCount            = user.followers.length || 0;
+          resObj.unreadCommentsCount       = user.unreadComments.length || 0;
+          resObj.unreadFollowingPoemsCount = user.unreadFollowingPoems.length || 0;
 
           if (req.query.profile === 'full') {
             // gather user poem titles and user comments
@@ -1045,6 +1047,28 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                   },
                   function(err) {
                     resObj.unreadComments = unreadComments;
+                    done(null, resObj);
+                  }
+                );
+              },
+              function(resObj, done) {
+                var unreadFollowingPoems = [];
+                async.each(user.unreadFollowingPoems,
+                  function(id, callback) {
+                    Poem.findById(id).populate('creator').exec(function(err, poem) {
+                      if (poem) {
+                        var unreadFollowingPoemObj       = {};
+                        unreadFollowingPoemObj.id        = hashids.encryptHex(poem._id),
+                        unreadFollowingPoemObj.title     = poem.title;
+                        unreadFollowingPoemObj.poem      = poem.poem;
+                        unreadFollowingPoemObj.createdAt = poem.createdAt;
+                        unreadFollowingPoems.push(unreadFollowingPoemObj);
+                        callback();
+                      }
+                    });
+                  },
+                  function(err) {
+                    resObj.unreadFollowingPoems = unreadFollowingPoems;
                     done(null, resObj);
                   }
                 );
@@ -1147,15 +1171,17 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               sucMsg = 'User1 is following user2.';
               console.log(sucMsg.blue);
               res.status(200).send({
-                type    : 'success',
-                message : sucMsg
+                type      : 'success',
+                message   : sucMsg,
+                following : 'yes'
               });
             } else {
               sucMsg = 'User1 is not following user2.';
               console.log(sucMsg.blue);
               res.status(200).send({
-                type    : 'success',
-                message : sucMsg
+                type      : 'success',
+                message   : sucMsg,
+                following : 'no'
               });
             }
           }
@@ -1610,18 +1636,22 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               resObj.poem          = poem;
               resObj.poem.creator  = creator;
               resObj.poem.comments = comments;
-              done(null, resObj, user._id);
+              done(null, resObj);
             }
           );
         },
-        function(resObj, creatorId, done) {
+        function(resObj, done) {
           if (!req.headers.authorization) {
             console.log('no token in header');
             done(null, resObj);
           } else {
             var token = req.headers.authorization.split(' ')[1];
             var payload = jwt.decode(token, auth.TOKEN_SECRET);
-            if (payload.sub == hashids.encryptHex(creatorId)) {
+
+            var encryptedCreatorId = resObj.poem.creator.id;
+            var decryptedCreatorId = hashids.decryptHex(encryptedCreatorId);
+
+            if (payload.sub == encryptedCreatorId) {
               console.log('The creator is requesting.');
 
               // Remove each unreadComment of this poem from creator's unreadComments[]
@@ -1632,7 +1662,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                   function(commentId, callback) {
                     Comment.findById(commentId).populate('poem').exec(function(err, comment) {
                       if (poemId == comment.poem._id) {
-                        User.findByIdAndUpdate(creatorId, {
+                        User.findByIdAndUpdate(decryptedCreatorId, {
                           '$pull': {
                             unreadComments: commentId
                           }
@@ -1654,7 +1684,14 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               }
             } else {
               console.log('The creator isn\'t requesting.');
-              done(null, resObj);
+              // remove poem from unreadFollowingPoems[] for User
+              User.findByIdAndUpdate(hashids.decryptHex(payload.sub), {
+                '$pull': {
+                  unreadFollowingPoems: poemId
+                }
+              }, function(err, user) {
+                done(null, resObj);
+              });
             }
           }
         }
@@ -2378,6 +2415,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('Request body:'.green, req.body);
 
       var sucMsg, errMsg;
+      var userId = req.user._id;
 
       var newPoem           = new Poem();
       newPoem.creator       = req.user._id;
@@ -2410,7 +2448,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         } else {
 
           // Add ref to creator
-          User.findByIdAndUpdate(req.user._id, {
+          User.findByIdAndUpdate(userId, {
             '$addToSet': {
               poems: poem._id
             }
@@ -2426,12 +2464,28 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                 message : errMsg
               });
             } else {
-              sucMsg = 'The poem was saved.';
-              console.log(sucMsg.blue);
-              res.status(200).send({
-                type    : 'success',
-                message : sucMsg
-              });
+
+              // add poem to unread following poems
+              // for each user in following, at to unread poems
+              async.each(user.followers,
+                function(followerId, callback) {
+                  User.findByIdAndUpdate(followerId, {
+                    '$addToSet': {
+                      unreadFollowingPoems: poem._id
+                    }
+                  }, function(err, user) {
+                    callback();
+                  });
+                },
+                function(err) {
+                  sucMsg = 'The poem was saved.';
+                  console.log(sucMsg.blue);
+                  res.status(200).send({
+                    type    : 'success',
+                    message : sucMsg
+                  });
+                }
+              );
             }
           });
         }
