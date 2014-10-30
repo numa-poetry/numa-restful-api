@@ -1504,6 +1504,46 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   );
 
   /**
+   * Mark unread poem as read
+   */
+  app.delete('/api/v1/user/:userId/read/poem/:poemId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[DELETE] /api/v1/user/:userId/read/poem/:poemId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId = req.user._id;
+      var poemId = hashids.decryptHex(req.params.poemId);
+
+      User.findByIdAndUpdate(userId, {
+        '$pull': {
+          unreadFollowingPoems : poemId
+        }
+      }, function(err, user) {
+        if (err) {
+          res.message = 'Could not mark poem as read.'
+          return next(err);
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          sucMsg = 'The user has marked the poem as read.'
+          console.log(sucMsg.blue);
+          res.status(200).send({
+            type    : 'success',
+            message : sucMsg
+          });
+        }
+      });
+    }
+  );
+
+  /**
    * Mark unread comment as read
    */
   app.delete('/api/v1/user/:userId/read/comment/:commentId/',
@@ -1984,11 +2024,44 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             if (err) {
               console.log('Error in removing poem from User favoritePoems.');
             } else {
-              done(null);
+              done(null, poem);
             }
           });
         },
-      ], function() {
+        function(poem, done) {
+          console.log('about to check image');
+          // Delete inspirational image
+          if (poem.inspirations.imageUrl) {
+            var remoteImage = poem.inspirations.imageUrl.split(".com/").pop();
+
+            var s3Params = {
+              Bucket : auth.amazon_s3.BUCKET_PERMANENT,
+              Delete : {
+                Objects: [{
+                  Key : remoteImage
+                }]
+              }
+            };
+
+            var deleter = s3Client.deleteObjects(s3Params);
+
+            deleter.on('error', function(err) {
+              errMsg = 'Unable to delete image.';
+              console.log(errMsg.red);
+              done(null);
+            });
+
+            deleter.on('end', function() {
+              sucMsg = 'Successful deletion of image.';
+              console.log(sucMsg.blue);
+              done(null);
+            });
+          } else {
+            console.log('The poem has no image.');
+            done(null);
+          }
+        },
+      ], function(err) {
           sucMsg = 'The poem was deleted.';
           console.log(sucMsg.blue);
           res.status(200).send({
