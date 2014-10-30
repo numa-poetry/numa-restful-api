@@ -977,6 +977,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           resObj.email                     = user.email;
           resObj.avatarUrl                 = user.avatarUrl;
           resObj.followersCount            = user.followers.length || 0;
+          resObj.followingCount            = user.following.length || 0;
           resObj.unreadCommentsCount       = user.unreadComments.length || 0;
           resObj.unreadFollowingPoemsCount = user.unreadFollowingPoems.length || 0;
 
@@ -1170,6 +1171,39 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           });
         }
       });
+    }
+  );
+
+  /**
+   * Get user following
+   */
+  app.get('/api/v1/user/:id/following',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/following'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var resArr = [];
+      async.each(req.user.following,
+        function(followingId, callback) {
+          User.findById(followingId, function(err, user) {
+            if (user) {
+              var following         = {};
+              following.id          = hashids.encryptHex(followingId);
+              following.displayName = user.displayName || user.local.displayName;
+              following.avatarUrl   = user.avatarUrl;
+              resArr.push(following);
+              callback();
+            }
+          });
+        },
+        function(err) {
+          res.status(200).send({
+            type      : 'success',
+            following : resArr
+          });
+        }
+      );
     }
   );
 
