@@ -981,130 +981,153 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           resObj.unreadFollowingPoemsCount = user.unreadFollowingPoems.length || 0;
 
           if (req.query.profile === 'full') {
+            console.log('requesting full profile');
             // gather user poem titles and user comments
             var poems = [];
             async.waterfall([
               function(done) {
-                async.each(user.poems,
-                  function(id, callback) {
-                    Poem.findById(id, function(err, poem) {
-                      if (poem) {
-                        var poemObj       = {};
-                        poemObj.id        = hashids.encryptHex(poem._id),
-                        poemObj.title     = poem.title;
-                        poemObj.poem      = poem.poem;
-                        poemObj.createdAt = poem.createdAt;
-                        poems.push(poemObj);
-                        callback();
-                      }
-                    });
-                  },
-                  function(err) {
-                    resObj.poems = poems;
-                    done(null, resObj);
-                  }
-                );
+                if (user.poems) {
+                  async.each(user.poems,
+                    function(id, callback) {
+                      Poem.findById(id, function(err, poem) {
+                        if (poem) {
+                          var poemObj       = {};
+                          poemObj.id        = hashids.encryptHex(poem._id),
+                          poemObj.title     = poem.title;
+                          poemObj.poem      = poem.poem;
+                          poemObj.createdAt = poem.createdAt;
+                          poems.push(poemObj);
+                          callback();
+                        }
+                      });
+                    },
+                    function(err) {
+                      resObj.poems = poems;
+                      done(null, resObj);
+                    }
+                  );
+                } else {
+                  done(null, resObj);
+                }
               },
               function(resObj, done) {
                 var comments = [];
-                async.each(user.comments,
-                  function(id, callback) {
-                    Comment.findById(id).populate('poem').exec(function(err, comment) {
-                      if (comment) {
-                        var commentObj       = {};
-                        commentObj.id        = hashids.encryptHex(comment._id),
-                        commentObj.comment   = comment.comment;
-                        commentObj.createdAt = comment.createdAt;
-                        commentObj.poemId    = hashids.encryptHex(comment.poem._id);
-                        commentObj.poemTitle = comment.poem.title;
-                        comments.push(commentObj);
-                        callback();
-                      }
-                    });
-                  },
-                  function(err) {
-                    resObj.comments = comments;
-                    done(null, resObj);
-                  }
-                );
+                if (user.comments) {
+                  async.each(user.comments,
+                    function(id, callback) {
+                      Comment.findById(id).populate('poem').exec(function(err, comment) {
+                        if (comment) {
+                          var commentObj       = {};
+                          commentObj.id        = hashids.encryptHex(comment._id),
+                          commentObj.comment   = comment.comment;
+                          commentObj.createdAt = comment.createdAt;
+                          commentObj.poemId    = hashids.encryptHex(comment.poem._id);
+                          commentObj.poemTitle = comment.poem.title;
+                          comments.push(commentObj);
+                          callback();
+                        }
+                      });
+                    },
+                    function(err) {
+                      resObj.comments = comments;
+                      done(null, resObj);
+                    }
+                  );
+                } else {
+                  done(null, resObj);
+                }
               },
               function(resObj, done) {
                 var unreadComments = [];
-                async.each(user.unreadComments,
-                  function(id, callback) {
-                    Comment.findById(id).populate('poem').exec(function(err, comment) {
-                      if (comment) {
-                        var unreadCommentObj       = {};
-                        unreadCommentObj.id        = hashids.encryptHex(comment._id),
-                        unreadCommentObj.comment   = comment.comment;
-                        unreadCommentObj.createdAt = comment.createdAt;
-                        unreadCommentObj.poemId    = hashids.encryptHex(comment.poem._id);
-                        unreadCommentObj.poemTitle = comment.poem.title;
-                        unreadComments.push(unreadCommentObj);
-                        callback();
-                      }
-                    });
-                  },
-                  function(err) {
-                    resObj.unreadComments = unreadComments;
-                    done(null, resObj);
-                  }
-                );
+                if (user.unreadComments) {
+                  async.each(user.unreadComments,
+                    function(id, callback) {
+                      Comment.findById(id).populate('poem').exec(function(err, comment) {
+                        if (comment) {
+                          var unreadCommentObj       = {};
+                          unreadCommentObj.id        = hashids.encryptHex(comment._id),
+                          unreadCommentObj.comment   = comment.comment;
+                          unreadCommentObj.createdAt = comment.createdAt;
+                          unreadCommentObj.poemId    = hashids.encryptHex(comment.poem._id);
+                          unreadCommentObj.poemTitle = comment.poem.title;
+                          unreadComments.push(unreadCommentObj);
+                          callback();
+                        }
+                      });
+                    },
+                    function(err) {
+                      resObj.unreadComments = unreadComments;
+                      done(null, resObj);
+                    }
+                  );
+                } else {
+                  done(null, resObj);
+                }
               },
               function(resObj, done) {
                 var unreadFollowingPoems = [];
-                async.each(user.unreadFollowingPoems,
-                  function(id, callback) {
-                    Poem.findById(id).populate('creator').exec(function(err, poem) {
-                      if (poem) {
-                        var unreadFollowingPoemObj       = {};
-                        unreadFollowingPoemObj.id        = hashids.encryptHex(poem._id),
-                        unreadFollowingPoemObj.title     = poem.title;
-                        unreadFollowingPoemObj.poem      = poem.poem;
-                        unreadFollowingPoemObj.createdAt = poem.createdAt;
-                        unreadFollowingPoems.push(unreadFollowingPoemObj);
-                        callback();
-                      }
-                    });
-                  },
-                  function(err) {
-                    resObj.unreadFollowingPoems = unreadFollowingPoems;
-                    done(null, resObj);
-                  }
-                );
+                if (user.unreadFollowingPoems) {
+                  async.each(user.unreadFollowingPoems,
+                    function(id, callback) {
+                      Poem.findById(id).populate('creator').exec(function(err, poem) {
+                        if (poem) {
+                          var unreadFollowingPoemObj       = {};
+                          unreadFollowingPoemObj.id        = hashids.encryptHex(poem._id),
+                          unreadFollowingPoemObj.title     = poem.title;
+                          unreadFollowingPoemObj.poem      = poem.poem;
+                          unreadFollowingPoemObj.createdAt = poem.createdAt;
+                          unreadFollowingPoems.push(unreadFollowingPoemObj);
+                          callback();
+                        }
+                      });
+                    },
+                    function(err) {
+                      resObj.unreadFollowingPoems = unreadFollowingPoems;
+                      done(null, resObj);
+                    }
+                  );
+                } else {
+                  done(null, resObj);
+                }
               },
               function(resObj, done) {
                 var favoritePoems = [];
-                async.each(user.favoritePoems,
-                  function(id, callback) {
-                    Poem.findById(id, function(err, poem) {
-                      if (poem) {
-                        var favoritePoemObj       = {};
-                        favoritePoemObj.id        = hashids.encryptHex(poem._id),
-                        favoritePoemObj.title     = poem.title;
-                        favoritePoemObj.poem      = poem.poem;
-                        favoritePoemObj.createdAt = poem.createdAt;
-                        favoritePoems.push(favoritePoemObj);
-                        callback();
-                      }
-                    });
-                  },
-                  function(err) {
-                    resObj.favoritePoems = favoritePoems;
-                    done(null, resObj);
-                  }
-                );
+                if (user.favoritePoems) {
+                  async.each(user.favoritePoems,
+                    function(id, callback) {
+                      Poem.findById(id, function(err, poem) {
+                        if (poem) {
+                          var favoritePoemObj       = {};
+                          favoritePoemObj.id        = hashids.encryptHex(poem._id),
+                          favoritePoemObj.title     = poem.title;
+                          favoritePoemObj.poem      = poem.poem;
+                          favoritePoemObj.createdAt = poem.createdAt;
+                          favoritePoems.push(favoritePoemObj);
+                          callback();
+                        }
+                      });
+                    },
+                    function(err) {
+                      resObj.favoritePoems = favoritePoems;
+                      done(null, resObj);
+                    }
+                  );
+                } else {
+                  done(null, resObj);
+                }
               },
             ], function(err, resObj) {
               if (err) {
                 res.message = 'Could not get user details.';
                 return next(err);
               } else {
+                console.log('done');
                 resObj.type = 'success';
                 res.status(200).send(resObj);
               }
             });
           } else {
+            console.log('done');
             resObj.type = 'success';
             res.status(200).send(resObj);
           }
@@ -1151,6 +1174,39 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   );
 
   /**
+   * Get user followers
+   */
+  app.get('/api/v1/user/:id/follower',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[GET] /api/v1/user/:id/follower'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var resArr = [];
+      async.each(req.user.followers,
+        function(followerId, callback) {
+          User.findById(followerId, function(err, user) {
+            if (user) {
+              var follower         = {};
+              follower.id          = hashids.encryptHex(followerId);
+              follower.displayName = user.displayName || user.local.displayName;
+              follower.avatarUrl   = user.avatarUrl;
+              resArr.push(follower);
+              callback();
+            }
+          });
+        },
+        function(err) {
+          res.status(200).send({
+            type      : 'success',
+            followers : resArr
+          });
+        }
+      );
+    }
+  );
+
+  /**
    * Determine if user1 is following user2
    */
   app.get('/api/v1/user/:id/follow/user/:followingId',
@@ -1164,7 +1220,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       var followingUserId = hashids.decryptHex(req.params.followingId);
 
       if (followerUserId !== followingUserId) {
-
         User.findOne({ _id: followerUserId, 'following': followingUserId },
           function(err, user) {
             if (user) {
