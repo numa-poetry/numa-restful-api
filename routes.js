@@ -23,8 +23,6 @@ var auth          = require('./config/auth.js');
 
 var hashids = new Hashids(auth.HASHIDS_SALT);
 
-var pdfStream = new PDFDocument;
-
 var s3Client = s3.createClient({
   s3Options: {
     accessKeyId     : auth.amazon_s3.ACCESS_KEY_ID,
@@ -87,6 +85,21 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     } else {
       return 1;
     }
+  }
+
+  function getTimeStamp() {
+    var today = new Date();
+    var dd    = today.getDate();
+    var mm    = today.getMonth()+1; //January is 0!
+    var yyyy  = today.getFullYear();
+
+    if (dd < 10) {
+      dd = '0' + dd
+    }
+    if (mm < 10) {
+      mm = '0' + mm
+    }
+    return (mm + '/' + dd + '/' + yyyy);
   }
 
   function startSocketSession(req, userId) {
@@ -216,25 +229,86 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
    * Generate PDF of user poems
    */
   app.get('/api/v1/user/:id/poem/pdf',
-    ensureAuthenticated,
+    // ensureAuthenticated, <-- TODO on client
     function(req, res, next) {
       console.log('\n[GET] /api/v1/user/:id/poem/pdf'.bold.green);
       console.log('Request body:'.green, req.body);
 
-      pdfStream.pipe(fs.createWriteStream(__dirname + '/tmp/test.pdf'));
-      pdfStream.fontSize(15);
-      pdfStream.text('test');
-      pdfStream.end();
+      var errMsg, sucMsg;
 
-      var filePath = __dirname + '/tmp/test.pdf';
-      var fileName = 'new.pdf';
+      // var doc = new PDFDocument;
 
-      res.download(filePath, fileName, function(err) {
+      // res.writeHead(200, {
+      //   'Content-Type': 'application/pdf',
+      //   'Access-Control-Allow-Origin': '*',
+      //   'Content-Disposition': 'attachment; filename=' + getTimeStamp() + '.pdf'
+      // });
+      // doc.pipe(res);
+
+      // doc.fontSize(15);
+      // doc.text('test');
+      // doc.end();
+      // return;
+
+      var userId = hashids.decryptHex(req.params.id);
+
+      User.findById(userId, function(err, user) {
         if (err) {
-          console.log(err);
-          // if (!res.headersSent) ...
+          res.message = 'The user could not be found.';
+          return next(err);
+        } else if (!user) {
+          errMsg = 'The user could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
         } else {
-          console.log('Send:', fileName);
+          var displayName = user.local.displayName || user.displayName;
+          if (user.poems) {
+            var doc = new PDFDocument;
+
+            res.writeHead(200, {
+              'Content-Type': 'application/pdf',
+              'Access-Control-Allow-Origin': '*',
+              'Content-Disposition': 'attachment; filename=' + getTimeStamp() + '.pdf'
+            });
+            doc.pipe(res);
+
+            doc.fontSize(40);
+            doc.text('Poems by ' + displayName);
+            doc.addPage();
+
+            async.each(user.poems,
+              function(id, callback) {
+                Poem.findById(id, function(err, poem) {
+                  if (poem) {
+                    doc.fontSize(30);
+                    doc.text(poem.title, { align: 'center' });
+
+                    doc.fontSize(15);
+                    doc.text(poem.poem);
+
+                    doc.text(poem.createdAt);
+                    doc.addPage();
+                    callback();
+                  }
+                });
+              },
+              function(err) {
+                // Finalize PDF file
+                doc.end();
+                return;
+              }
+            );
+          } else {
+            errMsg = 'The user has not written any poems.';
+            console.log(errMsg.red);
+            res.status(400).send({
+              type    : 'bad_request',
+              message : errMsg
+            });
+          }
         }
       });
     }
