@@ -271,7 +271,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             res.writeHead(200, {
               'Content-Type': 'application/pdf',
               'Access-Control-Allow-Origin': '*',
-              'Content-Disposition': 'attachment; filename=' + getTimeStamp() + '.pdf'
+              'Content-Disposition': 'attachment; filename=' + displayName + '-poems-' + getTimeStamp() + '.pdf'
             });
             doc.pipe(res);
 
@@ -283,13 +283,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               function(id, callback) {
                 Poem.findById(id, function(err, poem) {
                   if (poem) {
-                    doc.fontSize(30);
-                    doc.text(poem.title, { align: 'center' });
-
-                    doc.fontSize(15);
-                    doc.text(poem.poem);
-
-                    doc.text(poem.createdAt);
+                    doc.fontSize(30).text(poem.title, { align: 'center' }).moveDown(2);
+                    doc.fontSize(15).text(poem.poem);
                     doc.addPage();
                     callback();
                   }
@@ -1071,6 +1066,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                           poemObj.title     = poem.title;
                           poemObj.poem      = poem.poem;
                           poemObj.createdAt = poem.createdAt;
+                          poemObj.published = poem.published;
                           poems.push(poemObj);
                           callback();
                         }
@@ -1548,10 +1544,10 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         searchBy = req.query.searchby.split(',');
       }
 
+      query['published'] = true;
+
       // find all documents
-      if (poemQuery === null) {
-        query = {};
-      } else {
+      if (poemQuery !== null) {
         caseInsensitiveRegex = { $regex: poemQuery, $options: 'i' };
 
         // if multiple query strings, AND them together for a query
@@ -1604,7 +1600,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
 
       async.waterfall([
         function(done) {
-          Poem.paginate(query, pageNumber, 8, function(err, pageCount, paginatedPoems, itemCount) {
+          Poem.paginate(query, pageNumber, 15, function(err, pageCount, paginatedPoems, itemCount) {
             if (err) {
               res.message = 'Could not retrieve poems.';
               return next(err);
@@ -1926,7 +1922,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         'poem'                  : req.body.poem,
         'tags'                  : req.body.tags || '',
         'inspirations.imageUrl' : req.body.imageUrl || '',
-        'inspirations.videoUrl' : req.body.videoUrl || ''
+        'inspirations.videoUrl' : req.body.videoUrl || '',
+        'published'             : req.body.published || undefined
       }, function(err, poem) {
         if (err) {
           res.message = 'The poem could not be found.';
@@ -2653,12 +2650,15 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       var sucMsg, errMsg;
       var userId = req.user._id;
 
-      var newPoem           = new Poem();
-      newPoem.creator       = req.user._id;
-      newPoem.title         = req.body.title;
-      newPoem.poem          = req.body.poem;
-      newPoem.tags          = req.body.tags;
-      var inspirations      = {};
+      var newPoem       = new Poem();
+      newPoem.creator   = req.user._id;
+      newPoem.title     = req.body.title;
+      newPoem.poem      = req.body.poem;
+      newPoem.tags      = req.body.tags;
+      newPoem.published = req.body.published;
+      var inspirations  = {};
+
+      console.log(newPoem);
 
       var videoUrl = req.body.videoUrl;
       if (videoUrl) {
