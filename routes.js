@@ -45,11 +45,20 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     return decryptedText;
   }
 
-  // Function for sorting by creation date
+  // function for sorting by creation date
   function compareTimestampsAsc(a, b) {
     if (a.createdAt < b.createdAt)
       return 1;
     if (a.createdAt > b.createdAt)
+      return -1;
+    return 0;
+  }
+
+  // function for sorting by poem vote count
+  function compareVoteCountsAsc(a, b) {
+    if (a.voteCount < b.voteCount)
+      return 1;
+    if (a.voteCount > b.voteCount)
       return -1;
     return 0;
   }
@@ -1522,7 +1531,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   /**
    * Get 25 poems per page, paginating by page, sorted in ascending order by creation date
    *
-   * http://localhost:3000/api/v1/poem/?query=love&page=1&searchby=poem
+   * http://localhost:3000/api/v1/poem/?query=love&page=1&searchby=poem&sortby=votes
    *
    * query    : normal search query (case insensitive)
    * searchby : title, tag, content
@@ -1542,6 +1551,12 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
         searchBy = 'title';
       } else {
         searchBy = req.query.searchby.split(',');
+      }
+
+      var sortByCriteria = '-createdAt';
+
+      if (req.query.sortby === 'votes') {
+        sortByCriteria = '-voteCount';
       }
 
       query['published'] = true;
@@ -1614,7 +1629,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
             } else {
               done(null, paginatedPoems, pageCount, itemCount);
             }
-          }, { sortBy : '-createdAt' });
+          }, { sortBy : sortByCriteria });
         }
       ], function(err, paginatedPoems, pageCount, poemCount) {
           // for each poem, get the creator's information
@@ -1647,8 +1662,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               });
             },
             function(err) {
-              // sort poems in ascending order by creation date
-              resArr.sort(compareTimestampsAsc);
+              if (sortByCriteria === '-createdAt') {
+                // sort poems in ascending order by creation date
+                resArr.sort(compareTimestampsAsc);
+              } else if (sortByCriteria === '-voteCount') {
+                // sort poems in ascending order by vote count
+                resArr.sort(compareVoteCountsAsc);
+              }
               res.status(200).send({
                 type      : 'success',
                 poemCount : poemCount,
@@ -2362,14 +2382,26 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
               // Upvote
               if (req.body.vote === 'up') {
                 poem.upvote(userId, function(err, doc) {
-                  callback();
+                  Poem.findByIdAndUpdate(poemId, {
+                    '$inc': {
+                      voteCount: 1
+                    }
+                  }, function(err, poem) {
+                    callback();
+                  });
                 });
               }
 
               // Downvote
               else if (req.body.vote === 'down') {
                 poem.downvote(userId, function(err, doc) {
-                  callback();
+                  Poem.findByIdAndUpdate(poemId, {
+                    '$inc': {
+                      voteCount: -1
+                    }
+                  }, function(err, poem) {
+                    callback();
+                  });
                 });
               }
 
@@ -2381,7 +2413,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                       'vote.positive': userId
                     }
                   }, function(err, poem) {
-                    callback();
+                    Poem.findByIdAndUpdate(poemId, {
+                      '$inc': {
+                        voteCount: -1
+                      }
+                    }, function(err, poem) {
+                      callback();
+                    });
                   });
                 } else if (poem.downvoted(userId)) {
                   Poem.findByIdAndUpdate(poemId, {
@@ -2389,7 +2427,13 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                       'vote.negative': userId
                     }
                   }, function(err, poem) {
-                    callback();
+                    Poem.findByIdAndUpdate(poemId, {
+                      '$inc': {
+                        voteCount: -1
+                      }
+                    }, function(err, poem) {
+                      callback();
+                    });
                   });
                 }
               }
@@ -2549,7 +2593,6 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       });
     }
   );
-
 
   /**
    * Favorite a poem

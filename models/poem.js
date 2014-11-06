@@ -20,7 +20,8 @@ var poemSchema = new Schema({
     text     : { type: String },
     imageUrl : { type: String },
     videoUrl : { type: String }
-  }
+  },
+  voteCount : { type: Number, default: 0 }
 });
 
 // plugins ---------------------------------------------------------------------
