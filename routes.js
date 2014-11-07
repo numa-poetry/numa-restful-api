@@ -235,6 +235,25 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   );
 
   /**
+   * Get total number of published poems
+   */
+  app.get('/api/v1/poem/count',
+    function(req, res) {
+      console.log('\n/api/v1/poem/count'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      Poem.count({ 'published': true }, function(err, count){
+        console.log('Number of published poems:', count);
+        if (!err) {
+          res.status(200).send({
+            type  : 'success',
+            count : count
+          });
+        }
+      });
+    }
+  );
+  /**
    * Generate PDF of user poems
    */
   app.get('/api/v1/user/:id/poem/pdf',
@@ -693,9 +712,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   /**
    * Login with Facebook
    */
-  app.post('/auth/facebook',
+  app.post('/api/v1/auth/facebook',
     function(req, res, next) {
-      console.log('\n[POST] /auth/facebook'.bold.green);
+      console.log('\n[POST] /api/v1/auth/facebook'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var accessTokenUrl = 'https://graph.facebook.com/oauth/access_token';
@@ -801,9 +820,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   /**
    * Login with Github
    */
-  app.post('/auth/github',
+  app.post('/api/v1/auth/github',
     function(req, res, next) {
-      console.log('\n[POST] /auth/github'.bold.green);
+      console.log('\n[POST] /api/v1/auth/github'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var accessTokenUrl = 'https://github.com/login/oauth/access_token';
@@ -910,9 +929,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   /**
    * Login with Google
    */
-  app.post('/auth/google',
+  app.post('/api/v1/auth/google',
     function(req, res, next) {
-      console.log('\n[POST] /auth/google'.bold.green);
+      console.log('\n[POST] /api/v1/auth/google'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var accessTokenUrl = 'https://accounts.google.com/o/oauth2/token';
@@ -1529,7 +1548,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   );
 
   /**
-   * Get 25 poems per page, paginating by page, sorted in ascending order by creation date
+   * Get 15 poems per page, paginating by page, sorted in ascending order by creation date
    *
    * http://localhost:3000/api/v1/poem/?query=love&page=1&searchby=poem&sortby=votes
    *
@@ -1725,10 +1744,10 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
   /**
    * Mark unread comment as read
    */
-  app.delete('/api/v1/user/:userId/read/comment/:commentId/',
+  app.delete('/api/v1/user/:userId/read/comment/:commentId',
     ensureAuthenticated,
     function(req, res, next) {
-      console.log('\n[DELETE] /api/v1/user/:userId/read/comment/:commentId/'.bold.green);
+      console.log('\n[DELETE] /api/v1/user/:userId/read/comment/:commentId'.bold.green);
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
