@@ -1986,6 +1986,41 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
     }
   );
 
+  app.put('/api/v1/user/:userId/poem/:poemId/comment/:commentId',
+    ensureAuthenticated,
+    function(req, res, next) {
+      console.log('\n[PUT] /api/v1/user/:userId/poem/:poemId/comment/:commentId'.bold.green);
+      console.log('Request body:'.green, req.body);
+
+      var errMsg, sucMsg;
+      var userId    = req.user._id;
+      var poemId    = hashids.decryptHex(req.params.poemId);
+      var commentId = hashids.decryptHex(req.params.commentId);
+      var comment   = req.body.comment;
+
+      Comment.findByIdAndUpdate(commentId, {
+        'comment' : comment
+      }, function(err, comment) {
+        if (err) {
+          res.message = 'The comment could not be found.';
+          return next(err);
+        } else if (!comment) {
+          errMsg = 'The comment could not be found.';
+          console.log(errMsg.red);
+          res.status(404).send({
+            type    : 'not_found',
+            message : errMsg
+          });
+        } else {
+          res.status(200).send({
+            type    : 'success',
+            message : 'updated'
+          });
+        }
+      });
+    }
+  );
+
   /**
    * Delete a comment (as creator)
    */
@@ -1996,7 +2031,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
-      var userId    = hashids.decryptHex(req.params.userId);
+      var userId    = req._user.id;
       var poemId    = hashids.decryptHex(req.params.poemId);
       var commentId = hashids.decryptHex(req.params.commentId);
 
