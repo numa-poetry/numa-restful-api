@@ -1523,6 +1523,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       var userId = req.user._id;
 
       // DELETE POEMS
+      // DELETE COMMENTS
+      // DELETE AVATAR
 
       User.findByIdAndRemove(userId, function(err, user) {
         if (err) {
@@ -2998,7 +3000,8 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           });
         },
         function(destPath, done) {
-          var imageUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+          var imageUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath)
+            .replace(/^http:\/\//i, 'https://');
           done(null, imageUrl);
         }
       ], function(err, imageUrl) {
@@ -3069,7 +3072,9 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
           });
         },
         function(destPath, done) {
-          var avatarUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath);
+          var avatarUrl = s3.getPublicUrlHttp(auth.amazon_s3.BUCKET_PERMANENT, destPath)
+            .replace(/^http:\/\//i, 'https://');
+
 
           // save url to db
           User.findById(req.user._id, function(err, user) {
