@@ -1141,14 +1141,15 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                 if (user.unreadComments) {
                   async.each(user.unreadComments,
                     function(id, callback) {
-                      Comment.findById(id).populate('poem').exec(function(err, comment) {
+                      Comment.findById(id).populate('poem').populate('creator').exec(function(err, comment) {
                         if (comment) {
-                          var unreadCommentObj       = {};
-                          unreadCommentObj.id        = hashids.encryptHex(comment._id),
-                          unreadCommentObj.comment   = comment.comment;
-                          unreadCommentObj.createdAt = comment.createdAt;
-                          unreadCommentObj.poemId    = hashids.encryptHex(comment.poem._id);
-                          unreadCommentObj.poemTitle = comment.poem.title;
+                          var unreadCommentObj                = {};
+                          unreadCommentObj.id                 = hashids.encryptHex(comment._id),
+                          unreadCommentObj.comment            = comment.comment;
+                          unreadCommentObj.createdAt          = comment.createdAt;
+                          unreadCommentObj.poemId             = hashids.encryptHex(comment.poem._id);
+                          unreadCommentObj.poemTitle          = comment.poem.title;
+                          unreadCommentObj.creatorDisplayName = comment.creator.displayName || comment.creator.local.displayName;
                           unreadComments.push(unreadCommentObj);
                           callback();
                         }
@@ -1170,11 +1171,12 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                     function(id, callback) {
                       Poem.findById(id).populate('creator').exec(function(err, poem) {
                         if (poem) {
-                          var unreadFollowingPoemObj       = {};
-                          unreadFollowingPoemObj.id        = hashids.encryptHex(poem._id),
-                          unreadFollowingPoemObj.title     = poem.title;
-                          unreadFollowingPoemObj.poem      = poem.poem;
-                          unreadFollowingPoemObj.createdAt = poem.createdAt;
+                          var unreadFollowingPoemObj                = {};
+                          unreadFollowingPoemObj.id                 = hashids.encryptHex(poem._id),
+                          unreadFollowingPoemObj.title              = poem.title;
+                          unreadFollowingPoemObj.poem               = poem.poem;
+                          unreadFollowingPoemObj.createdAt          = poem.createdAt;
+                          unreadFollowingPoemObj.creatorDisplayName = poem.creator.displayName || poem.creator.local.displayName;
                           unreadFollowingPoems.push(unreadFollowingPoemObj);
                           callback();
                         }
@@ -2033,7 +2035,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
       console.log('Request body:'.green, req.body);
 
       var errMsg, sucMsg;
-      var userId    = req._user.id;
+      var userId    = req.user._id;
       var poemId    = hashids.decryptHex(req.params.poemId);
       var commentId = hashids.decryptHex(req.params.commentId);
 
@@ -2050,7 +2052,7 @@ module.exports = function(app, io, clientSocketsHash, loggedInClientsHash) {
                 type    : 'not_found',
                 message : errMsg
               });
-            } else if ((comment.poem.creator == req.user._id + '') || (comment.creator == req.user._id + '')) {
+            } else if ((comment.poem.creator == userId + '') || (comment.creator == userId + '')) {
               done(null, comment.poem.creator);
             } else {
               errMsg = 'The requesting user is not the poem\'s creator.';

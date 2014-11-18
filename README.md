@@ -24,7 +24,7 @@ I'll be adding the RESTful API docs at [ReadMe.io](http://numa.readme.io/v1.0)
 
 The MIT License (MIT)
 
-Copyright (c) [year] [fullname]
+Copyright (c) 2014 Andreas Basurto
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
